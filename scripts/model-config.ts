@@ -15,6 +15,7 @@ export interface StoredModelConfig {
   version: 1
   provider: string
   model: string
+  reasoningEffort?: 'off' | 'high' | 'max'
 }
 
 /** Models advertised by the dsh official DeepSeek adapter. */
@@ -114,17 +115,19 @@ export async function readModelConfig(path = modelConfigPath()): Promise<StoredM
     if (!parsed || typeof parsed !== 'object') return undefined
     const value = parsed as Record<string, unknown>
     if (value.version !== 1 || typeof value.provider !== 'string' || typeof value.model !== 'string') return undefined
-    return { version: 1, provider: value.provider, model: value.model }
+    const effort = value.reasoningEffort
+    if (effort !== undefined && effort !== 'off' && effort !== 'high' && effort !== 'max') return undefined
+    return { version: 1, provider: value.provider, model: value.model, ...(effort === undefined ? {} : { reasoningEffort: effort }) }
   } catch (error) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
     throw error
   }
 }
 
-export async function writeModelConfig(model: string, provider = 'deepseek-official', path = modelConfigPath()): Promise<StoredModelConfig> {
+export async function writeModelConfig(model: string, provider = 'deepseek-official', path = modelConfigPath(), reasoningEffort: StoredModelConfig['reasoningEffort'] = 'high'): Promise<StoredModelConfig> {
   const selected = findModel(model)
   if (!selected) throw new Error(`unknown model ${JSON.stringify(model)}; run --list-models first`)
-  const config: StoredModelConfig = { version: 1, provider: selected.provider, model: selected.id }
+  const config: StoredModelConfig = { version: 1, provider: selected.provider, model: selected.id, reasoningEffort }
   await mkdir(dirname(path), { recursive: true })
   const temporary = `${path}.tmp-${process.pid}`
   await writeFile(temporary, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 })

@@ -32,15 +32,21 @@ dsh 当前官方 DeepSeek provider 的基础模型为：
 
 以上是 dsh 官方 adapter 的默认 catalog；自定义 Cordis/settings 可以替换或增加模型。自定义模型不要写入默认选择器时，可直接用显式 `--model` 或 `DSH_MODEL`。
 
-首次使用且没有显式 `--model`、`DSH_MODEL` 或持久配置时，脚本会返回 `status=model-selection-required` 和模型列表。主 agent 必须把这两个选项告知用户，请用户选择后执行：
+首次使用且没有显式 `--model`、`DSH_MODEL` 或持久配置时，脚本会返回 `status=model-selection-required` 和模型列表。主 agent 必须优先推荐 Flash 组合（官方 Flash，其次视觉/自动识图 Flash），并让用户选择思考程度：
+
+- `off`：关闭思考，响应更快
+- `high`：默认平衡档
+- `max`：复杂任务优先
+
+用户选择后执行：
 
 ```sh
 pnpm --dir /Users/kdump/llm/project/official/deepseek-harness exec tsx \
   /Users/kdump/llm/skills/deepseek-harness-subagent/scripts/configure.ts \
-  --set-model deepseek-v4-flash
+  --set-model deepseek-official/deepseek-v4-flash --reasoning-effort high
 ```
 
-配置默认写入 `~/.config/deepseek-harness-subagent/config.json`（可用 `DSH_SUBAGENT_CONFIG` 或 `--config` 覆盖），只保存 provider/model，不保存密钥。之后用户不提模型时，自动使用该配置，不再询问；显式 `--model` 和 `DSH_MODEL` 优先级更高。查看模型和当前配置：
+配置默认写入 `~/.config/deepseek-harness-subagent/config.json`（可用 `DSH_SUBAGENT_CONFIG` 或 `--config` 覆盖），保存 provider/model/reasoningEffort，不保存密钥。之后用户不提模型或思考程度时，自动使用该配置，不再询问；显式 `--model`、`DSH_MODEL`、`--reasoning-effort` 和 `DSH_REASONING_EFFORT` 优先级更高。查看模型和当前配置：
 
 ```sh
 .../scripts/configure.ts --list-models

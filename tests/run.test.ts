@@ -33,6 +33,7 @@ describe('Node SDK skill runner helpers', () => {
 
   it('keeps the Python request-timeout spelling as seconds', () => {
     assert.equal(parseArgs(['--task', 'x', '--request-timeout', '2']).requestTimeoutMs, 2000)
+    assert.equal(parseArgs(['--task', 'x', '--reasoning-effort', 'max']).reasoningEffort, 'max')
   })
 
   it('rejects invalid task source and timeout values', () => {
@@ -74,6 +75,7 @@ describe('Node SDK skill runner helpers', () => {
       assert.equal(CURRENT_MODELS.length, 2)
       const saved = await writeModelConfig('deepseek-v4-pro', 'deepseek-official', path)
       assert.deepEqual(await readModelConfig(path), saved)
+      assert.equal(saved.reasoningEffort, 'high')
       assert.match(await readFile(path, 'utf8'), /deepseek-v4-pro/)
       assert.doesNotMatch(await readFile(path, 'utf8'), /API_KEY|SECRET|PASSWORD/)
     } finally {

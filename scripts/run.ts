@@ -10,11 +10,11 @@ import {
   type HarnessNotification,
   type RunResult,
 } from '@deepseek-ai/dsh-sdk-client'
-import { modelConfigPath, modelOptions, readModelConfig } from './model-config.ts'
+import { modelConfigPath, modelOptions, readModelConfig, type StoredModelConfig } from './model-config.ts'
 
 export const DEFAULT_REPO = '/Users/kdump/llm/project/official/deepseek-harness'
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 3600
-export const MODEL_SELECTION_AGENT_INSTRUCTION = '必须先把 models 列表告知用户并请求选择一个默认模型；用户选择后运行 scripts/configure.ts --set-model MODEL 保存配置，再重新执行原任务。未完成选择前不得猜测模型或继续调用 subagent。'
+export const MODEL_SELECTION_AGENT_INSTRUCTION = '必须先把 models 列表告知用户并优先推荐 Flash 组合（官方 Flash，其次视觉/自动识图 Flash）；同时请求用户选择思考程度 off/high/max。用户选择后运行 scripts/configure.ts --set-model MODEL --reasoning-effort LEVEL 保存配置，再重新执行原任务。未完成选择前不得猜测模型或继续调用 subagent。'
 
 export class IdleTimeoutError extends Error {
   constructor(public readonly idleTimeoutSeconds: number) {
@@ -41,6 +41,7 @@ export interface CliOptions {
   sessionRoot?: string
   provider: string
   model?: string
+  reasoningEffort?: StoredModelConfig['reasoningEffort']
   maxTokens?: number
   requestTimeoutMs?: number
   idleTimeoutSeconds: number
@@ -133,6 +134,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let sessionRoot: string | undefined
   let provider = 'deepseek-official'
   let model = process.env.DSH_MODEL
+  let reasoningEffort = process.env.DSH_REASONING_EFFORT as CliOptions['reasoningEffort']
   let maxTokens: number | undefined
   let requestTimeoutMs: number | undefined
   let idleTimeoutSeconds = DEFAULT_IDLE_TIMEOUT_SECONDS
@@ -157,6 +159,7 @@ export function parseArgs(argv: string[]): CliOptions {
       case '--session-root': sessionRoot = value(argv, index++, arg); break
       case '--provider': provider = value(argv, index++, arg); break
       case '--model': model = value(argv, index++, arg); break
+      case '--reasoning-effort': reasoningEffort = value(argv, index++, arg) as CliOptions['reasoningEffort']; break
       case '--max-tokens': maxTokens = Number(value(argv, index++, arg)); break
       case '--request-timeout-ms': requestTimeoutMs = Number(value(argv, index++, arg)); break
       case '--request-timeout': requestTimeoutMs = Number(value(argv, index++, arg)) * 1000; break
@@ -180,6 +183,7 @@ export function parseArgs(argv: string[]): CliOptions {
   if (maxTokens !== undefined && (!Number.isSafeInteger(maxTokens) || maxTokens <= 0)) throw new Error('--max-tokens must be positive')
   if (requestTimeoutMs !== undefined && (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0)) throw new Error('--request-timeout-ms must be positive')
   if (format !== 'json' && format !== 'text') throw new Error('--format must be json or text')
+  if (reasoningEffort !== undefined && !['off', 'high', 'max'].includes(reasoningEffort)) throw new Error('--reasoning-effort must be off, high, or max')
   if (stdin) tasks.push('')
   return {
     tasks,
@@ -190,6 +194,7 @@ export function parseArgs(argv: string[]): CliOptions {
     ...(sessionRoot === undefined ? {} : { sessionRoot: resolve(sessionRoot) }),
     provider,
     model,
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
     ...(maxTokens === undefined ? {} : { maxTokens }),
     ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
     idleTimeoutSeconds,
@@ -204,7 +209,7 @@ export function parseArgs(argv: string[]): CliOptions {
 }
 
 function printHelp(): void {
-  process.stdout.write(`Node SDK DeepSeek Harness runner\n\n--task TEXT (repeatable) | --input-json JSON | --stdin\n--cwd PATH --repo PATH --cordis PATH --session-id ID --session-root PATH\n--provider NAME --model NAME --max-tokens N --request-timeout SECONDS\n--request-timeout-ms MS --idle-timeout SECONDS (default 3600; 0 disables)\n--runtime-bin PATH --base-url URL --api-key KEY --env KEY=VALUE\n--no-announce-cwd --stream-events --format json|text\n`)
+  process.stdout.write(`Node SDK DeepSeek Harness runner\n\n--task TEXT (repeatable) | --input-json JSON | --stdin\n--cwd PATH --repo PATH --cordis PATH --session-id ID --session-root PATH\n--provider NAME --model NAME --reasoning-effort off|high|max --max-tokens N --request-timeout SECONDS\n--request-timeout-ms MS --idle-timeout SECONDS (default 3600; 0 disables)\n--runtime-bin PATH --base-url URL --api-key KEY --env KEY=VALUE\n--no-announce-cwd --stream-events --format json|text\n`)
 }
 
 function runtimePath(options: CliOptions): string {
@@ -278,6 +283,7 @@ export async function run(options: CliOptions): Promise<Record<string, unknown>>
   const storedConfig = await readModelConfig()
   const model = options.model ?? storedConfig?.model
   if (!model) throw new ModelSelectionRequiredError(modelConfigPath())
+  const reasoningEffort = options.reasoningEffort ?? storedConfig?.reasoningEffort ?? 'high'
   const provider = options.provider !== 'deepseek-official' ? options.provider : (storedConfig?.provider ?? options.provider)
   const [cwdInfo, repoInfo, cordisInfo, runtimeInfo] = await Promise.all([
     stat(options.cwd),
@@ -298,6 +304,7 @@ export async function run(options: CliOptions): Promise<Record<string, unknown>>
     cwd: options.cwd,
     provider,
     model,
+    reasoningEffort,
     ...(options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }),
   })
   const turns: Array<Record<string, unknown>> = []
@@ -333,6 +340,7 @@ export async function run(options: CliOptions): Promise<Record<string, unknown>>
     runtimeBin: runtimePath(options),
     provider,
     model,
+    reasoningEffort,
     capabilities: capabilityMatrix(options.idleTimeoutSeconds),
   }
 }
