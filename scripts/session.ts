@@ -1,11 +1,29 @@
 #!/usr/bin/env node
 import process from 'node:process'
+import { unlink } from 'node:fs/promises'
+import { resolve } from 'node:path'
+
+function rawTaskFiles(argv: string[]): string[] {
+  const files: string[] = []
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === '--task-file' && argv[index + 1] !== undefined) files.push(resolve(argv[++index]))
+  }
+  return files
+}
+
+async function cleanupRawTaskFiles(argv: string[]): Promise<void> {
+  await Promise.all(rawTaskFiles(argv).map(async (file) => {
+    try { await unlink(file) } catch {}
+  }))
+}
 
 let IdleTimeoutError: typeof import('./run.ts').IdleTimeoutError
 let MODEL_SELECTION_AGENT_INSTRUCTION: string
 let ModelSelectionRequiredError: typeof import('./run.ts').ModelSelectionRequiredError
 let failureDetails: typeof import('./run.ts').failureDetails
+let cleanupTaskFiles: typeof import('./run.ts').cleanupTaskFiles
 let parseArgs: typeof import('./run.ts').parseArgs
+let taskFilesFromArgv: typeof import('./run.ts').taskFilesFromArgv
 let run: typeof import('./run.ts').run
 
 try {
@@ -15,8 +33,9 @@ try {
   process.env.DSH_PACKAGED_RUNTIME_ROOT = runtime.root
   process.env.DSH_PACKAGED_RUNTIME_BIN = runtime.runtimeBin
   process.env.DSH_PACKAGED_CORDIS = String(runtime.cordis);
-  ({ IdleTimeoutError, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, failureDetails, parseArgs, run } = await import('./run.ts'))
-  const options = parseArgs(process.argv.slice(2))
+  ({ IdleTimeoutError, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, cleanupTaskFiles, failureDetails, parseArgs, run, taskFilesFromArgv } = await import('./run.ts'))
+  const argv = process.argv.slice(2)
+  const options = parseArgs(argv)
   const result = await run(options)
   const { serializeResult } = await import('./serialize.ts')
   if (options.format === 'text') {
@@ -25,6 +44,7 @@ try {
     process.stdout.write(await serializeResult(result, options.format))
   }
 } catch (error) {
+  await cleanupRawTaskFiles(process.argv.slice(2))
   const timeout = IdleTimeoutError !== undefined && error instanceof IdleTimeoutError
   const modelRequired = ModelSelectionRequiredError !== undefined && error instanceof ModelSelectionRequiredError
   const failure = timeout || modelRequired ? undefined : failureDetails === undefined
@@ -40,6 +60,9 @@ try {
     nextAction: timeout
       ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试'
       : modelRequired ? '先从 models 中选择模型并运行 scripts/configure.mjs --set-model MODEL' : failure?.nextAction,
+  }
+  if (cleanupTaskFiles !== undefined && taskFilesFromArgv !== undefined) {
+    try { await cleanupTaskFiles(taskFilesFromArgv(process.argv.slice(2))) } catch {}
   }
   try {
     const { serializeResult } = await import('./serialize.ts')

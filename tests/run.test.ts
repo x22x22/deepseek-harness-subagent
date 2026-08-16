@@ -23,6 +23,28 @@ describe('Node SDK skill runner helpers', () => {
     assert.throws(() => parseArgs(['--task', 'x', '--format', 'yaml']), /toon, json, or text/)
   })
 
+  it('accepts repeatable Markdown task files and rejects mixing them with stdin', () => {
+    const options = parseArgs(['--task-file', 'tmp/one.md', '--task-file', 'tmp/two.md'])
+    assert.deepEqual(options.taskFiles, [join(process.cwd(), 'tmp/one.md'), join(process.cwd(), 'tmp/two.md')])
+    assert.throws(() => parseArgs(['--stdin', '--task-file', 'tmp/one.md']), /cannot be combined/)
+  })
+
+  it('deletes one-shot task files even when task setup fails', async () => {
+    const directory = await mkdtemp(join(process.cwd(), 'tmp-task-file-cleanup-'))
+    const file = join(directory, 'message.md')
+    const previous = process.env.DSH_SUBAGENT_CONFIG
+    await (await import('node:fs/promises')).writeFile(file, '# 长消息\n\n保留 Markdown 格式。')
+    process.env.DSH_SUBAGENT_CONFIG = join(directory, 'missing-config.json')
+    try {
+      await assert.rejects(run(parseArgs(['--task-file', file])), ModelSelectionRequiredError)
+      await assert.rejects(readFile(file, 'utf8'), { code: 'ENOENT' })
+    } finally {
+      if (previous === undefined) delete process.env.DSH_SUBAGENT_CONFIG
+      else process.env.DSH_SUBAGENT_CONFIG = previous
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
   it('generates a friendly resumable session identity and exposes it at the top level', () => {
     const generated = createSessionId(new Date('2026-08-17T12:34:56.000Z'), 'abc123')
     assert.equal(generated, 'dsh-20260817123456-abc123')

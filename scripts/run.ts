@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Node/TypeScript SDK runner used by the DeepSeek Harness subagent skill. */
 
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, stat, unlink } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
 import { homedir } from 'node:os'
 import { extname, join, resolve } from 'node:path'
@@ -83,6 +83,7 @@ export function resolveModelRoute(requestedModel: string, requestedProvider = 'd
 
 export interface CliOptions {
   tasks: Array<string | ContentBlock[]>
+  taskFiles: string[]
   cwd: string
   repo: string
   cordis: string
@@ -190,8 +191,25 @@ function value(args: string[], index: number, flag: string): string {
   return item
 }
 
+export function taskFilesFromArgv(argv: string[]): string[] {
+  const files: string[] = []
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === '--task-file' && argv[index + 1] !== undefined) files.push(resolve(argv[++index]))
+  }
+  return files
+}
+
+export async function cleanupTaskFiles(files: string[]): Promise<void> {
+  await Promise.all(files.map(async (file) => {
+    try { await unlink(file) } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+  }))
+}
+
 export function parseArgs(argv: string[]): CliOptions {
   const tasks: Array<string | ContentBlock[]> = []
+  const taskFiles: string[] = []
   const envValues: string[] = []
   let cwd = process.cwd()
   let repo = process.env.DSH_PACKAGED_RUNTIME_ROOT ?? DEFAULT_REPO
@@ -217,6 +235,7 @@ export function parseArgs(argv: string[]): CliOptions {
     const arg = argv[index]
     switch (arg) {
       case '--task': tasks.push(value(argv, index++, arg)); break
+      case '--task-file': taskFiles.push(resolve(value(argv, index++, arg))); break
       case '--input-json': tasks.push(JSON.parse(value(argv, index++, arg)) as ContentBlock[]); break
       case '--stdin': stdin = true; break
       case '--cwd': cwd = value(argv, index++, arg); break
@@ -244,8 +263,8 @@ export function parseArgs(argv: string[]): CliOptions {
       default: throw new Error(`unknown argument: ${arg}`)
     }
   }
-  if (stdin && tasks.length > 0) throw new Error('--stdin cannot be combined with --task or --input-json')
-  if (!stdin && tasks.length === 0) throw new Error('one of --task, --input-json, or --stdin is required')
+  if (stdin && (tasks.length > 0 || taskFiles.length > 0)) throw new Error('--stdin cannot be combined with --task, --task-file, or --input-json')
+  if (!stdin && tasks.length === 0 && taskFiles.length === 0) throw new Error('one of --task, --task-file, --input-json, or --stdin is required')
   const resolvedCwd = resolve(cwd)
   const resolvedSessionId = sessionId ?? createSessionId()
   const resolvedSessionRoot = resolve(sessionRoot ?? join(resolvedCwd, '.dsh-sessions'))
@@ -258,6 +277,7 @@ export function parseArgs(argv: string[]): CliOptions {
   if (stdin) tasks.push('')
   return {
     tasks,
+    taskFiles,
     cwd: resolvedCwd,
     repo: resolve(repo),
     cordis: resolve(cordis ?? `${repo}/examples/jsonrpc-agent/cordis.yml`),
@@ -282,7 +302,7 @@ export function parseArgs(argv: string[]): CliOptions {
 }
 
 function printHelp(): void {
-  process.stdout.write(`Node SDK DeepSeek Harness runner\n\n--task TEXT (repeatable) | --input-json JSON | --stdin\n--cwd PATH --repo PATH --cordis PATH --session-id ID --session-root PATH\n--provider NAME --model NAME --reasoning-effort off|high|max --max-tokens N --request-timeout SECONDS\n--request-timeout-ms MS --idle-timeout SECONDS (default 3600; 0 disables)\n--runtime-bin PATH --base-url URL --api-key KEY --env KEY=VALUE\n--no-announce-cwd --stream-events --include-events --format toon|json|text (default toon)\n`)
+  process.stdout.write(`Node SDK DeepSeek Harness runner\n\n--task TEXT (repeatable) | --task-file MD (repeatable, auto-deleted) | --input-json JSON | --stdin\n--cwd PATH --repo PATH --cordis PATH --session-id ID --session-root PATH\n--provider NAME --model NAME --reasoning-effort off|high|max --max-tokens N --request-timeout SECONDS\n--request-timeout-ms MS --idle-timeout SECONDS (default 3600; 0 disables)\n--runtime-bin PATH --base-url URL --api-key KEY --env KEY=VALUE\n--no-announce-cwd --stream-events --include-events --format toon|json|text (default toon)\n`)
 }
 
 function runtimePath(options: CliOptions): string {
@@ -354,8 +374,13 @@ async function runWithIdleTimeout(
   }
 }
 
-export async function run(options: CliOptions): Promise<Record<string, unknown>> {
-  const tasks = options.tasks[0] === '' ? [await readFile(0, 'utf8')] : options.tasks
+async function runInternal(options: CliOptions): Promise<Record<string, unknown>> {
+  const fileTasks = await Promise.all(options.taskFiles.map(async (file) => {
+    const info = await stat(file)
+    if (!info.isFile()) throw new Error(`--task-file must point to a regular file: ${file}`)
+    return readFile(file, 'utf8')
+  }))
+  const tasks = options.tasks[0] === '' ? [await readFile(0, 'utf8')] : [...options.tasks, ...fileTasks]
   if (tasks.length === 0 || tasks.some((task) => typeof task === 'string' && !task.trim())) throw new Error('task must not be blank')
   const storedConfig = await readModelConfig()
   const requestedModel = options.model ?? storedConfig?.model
@@ -440,6 +465,13 @@ export async function run(options: CliOptions): Promise<Record<string, unknown>>
   }
 }
 
+/** Run a task and always remove one-shot Markdown message files afterward. */
+export async function run(options: CliOptions): Promise<Record<string, unknown>> {
+  try {
+    return await runInternal(options)
+  } finally { await cleanupTaskFiles(options.taskFiles) }
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     const options = parseArgs(process.argv.slice(2))
@@ -464,6 +496,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试'
         : modelRequired ? undefined : failure?.nextAction,
     }
+    await cleanupTaskFiles(taskFilesFromArgv(process.argv.slice(2)))
     const { serializeResult } = await import('./serialize.ts')
     process.stdout.write(await serializeResult(output, 'toon'))
     process.exitCode = 1

@@ -13,6 +13,8 @@ description: Run an independent task in a separate DeepSeek Harness (dsh) proces
   `node /Users/kdump/.codex/skills/deepseek-harness-subagent/scripts/session.mjs`
 - 禁止使用宿主自身的 subagent、线程委托或协作工具代替上述脚本。
 - 任务提示词保持自包含、简短、只做必要工作；只读任务明确禁止改文件。
+- 超长或格式复杂的消息使用 `--task-file /绝对路径/message.md` 发送：脚本会先读取 Markdown 内容作为消息正文，再发送给 dsh；不要让 subagent 自己去读取该路径。
+- `--task-file` 指向的是一次性临时文件。脚本无论发送成功、模型失败、runtime 失败还是配置失败，都会在结束路径自动删除它；调用方不要把需要长期保留的文档作为参数传入。
 - 只有脚本返回 `status=completed` 且 `answer` 非空，才算收到 dsh 回复；保留 subagent 原文。
 - 每次独立测试都必须新建调用会话并使用新的自动生成或显式 `--session-id`；只有明确要延续对话时才复用已有会话 ID。
 
@@ -37,6 +39,15 @@ node /Users/kdump/.codex/skills/deepseek-harness-subagent/scripts/session.mjs \
   --session-root "$PWD/.dsh-sessions" \
   --cwd "$PWD" \
   --task '查询今天上海天气，只返回天气、来源或查询时间。' \
+  --request-timeout-ms 120000
+```
+
+长消息示例（文件内容会被读取后直接发送，文件随后自动删除）：
+
+```sh
+node /Users/kdump/.codex/skills/deepseek-harness-subagent/scripts/session.mjs \
+  --cwd "$PWD" \
+  --task-file "$PWD/tmp/subagent-message.md" \
   --request-timeout-ms 120000
 ```
 
