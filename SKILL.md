@@ -54,7 +54,8 @@ node /Users/kdump/.codex/skills/deepseek-harness-subagent/scripts/session.mjs \
 
 ## Runtime 与失败处理
 
-- 脚本自动准备并复用 `~/.cache/deepseek-harness-subagent/runtime/`，并把本机 dsh home 传给 runtime；正常任务不需要在提示词中讨论凭据。
+- 脚本自动准备并复用 `~/.cache/deepseek-harness-subagent/runtime/`，初始化时会自动安装官方 Node 包 `dsh-storage`、`dsh-storage-json`、`dsh-storage-domain`、`dsh-workspace`，并把本机 dsh home 传给 runtime；正常任务不需要在提示词中讨论凭据。
+- runtime 使用共享的 `$DSH_HOME/storages` 加载 workspace 注册表；新会话会尝试按 cwd 自动创建并绑定工作区，未指定标题时工作区名称就是 cwd 的最后一层目录名。dsh Web 已经运行时，Web 进程可能需要刷新或重启后重新读取外部进程写入的 workspace 注册表。
 - 任何 runtime、provider、网关、cwd 或超时失败，都先阅读 `references/troubleshooting.md`，按其中流程做最小复测。
 - 失败由脚本统一返回可执行的下一步；不要把底层错误原文、完整环境变量或凭据内容写入任务文本或报告。
 - `idle-timeout` 不能直接判定任务失败，必须检查子进程、stderr、notifications、session JSONL 和工作目录状态。

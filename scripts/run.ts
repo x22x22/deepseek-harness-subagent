@@ -4,7 +4,7 @@
 import { readFile, stat, unlink } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
 import { homedir } from 'node:os'
-import { extname, join, resolve } from 'node:path'
+import { dirname, extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import process from 'node:process'
 import type { ContentBlock, HarnessNotification, RunResult } from '@deepseek-ai/dsh-sdk-client'
@@ -323,6 +323,8 @@ export function runtimeLaunch(options: CliOptions): { command: string; args: str
     TSX_TSCONFIG_PATH: `${options.repo}/tsconfig.json`,
     DSH_CORDIS_CONFIG: options.cordis,
     DSH_CWD: options.cwd,
+    DSH_STORAGE_ROOT: join(dshHome, 'storages'),
+    DSH_WORKSPACE_BRIDGE: join(dirname(options.cordis), 'workspace-bridge.mjs'),
     CODEX_PARENT_CWD: options.cwd,
     ...(options.baseUrl === undefined ? {} : { DEEPSEEK_BASE_URL: options.baseUrl }),
     ...(options.apiKey === undefined ? {} : { DEEPSEEK_API_KEY: options.apiKey }),

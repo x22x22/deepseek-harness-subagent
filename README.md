@@ -4,7 +4,7 @@
 
 ## 用户安装
 
-需要 Node.js 20+。安装时不要求本机有 dsh 源码仓库，也不需要手动安装本 skill 的 Node 依赖；首次运行脚本会自动准备官方 runtime 到用户缓存目录。
+需要 Node.js 20+。安装时不要求本机有 dsh 源码仓库，也不需要手动安装本 skill 的 Node 依赖；首次运行脚本会自动准备官方 runtime 到用户缓存目录，并安装 dsh 的 storage/workspace 插件。
 
 ```sh
 npx --yes skills add x22x22/deepseek-harness-subagent
@@ -49,7 +49,7 @@ node ~/.codex/skills/deepseek-harness-subagent/scripts/session.mjs \
   --task '检查当前项目并运行最小相关测试。'
 ```
 
-默认结果是 TOON 格式；需要 JSON 时显式加 `--format json`。会话默认统一写入 `$DSH_HOME/sessions`（未设置时为 `~/.dsh/sessions`），不传 `--session-id` 时脚本会生成友好且不易冲突的会话 ID，并在结果中返回 `sessionId`、`sessionRoot` 和 `resumeHint`。这样后续启动 dsh Web 时可以读取同一会话目录。
+默认结果是 TOON 格式；需要 JSON 时显式加 `--format json`。会话默认统一写入 `$DSH_HOME/sessions`，workspace 注册表写入 `$DSH_HOME/storages`（未设置 `DSH_HOME` 时均位于 `~/.dsh`）。新会话会按 cwd 最后一层目录名创建或绑定工作区；不传 `--session-id` 时脚本会生成友好且不易冲突的会话 ID，并在结果中返回 `sessionId`、`sessionRoot` 和 `resumeHint`。这样后续启动 dsh Web 时可以读取同一会话和 workspace 数据；若 Web 已在运行，刷新或重启后可重新加载外部进程新增的 workspace 归属。
 
 超长或格式复杂的消息可以写入一次性 Markdown 文件：
 

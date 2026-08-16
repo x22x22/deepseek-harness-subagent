@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { DEFAULT_IDLE_TIMEOUT_SECONDS, DshTaskFailedError, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, createSessionId, failureDetails, finishReason, parseArgs, parseEnv, resolveModelRoute, run, runtimeLaunch, scrubEnvironment, sessionMetadata } from '../scripts/run.ts'
 import { CURRENT_MODELS, localModelOptions, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
 import { parseArgs as parseStartArgs, processMatches } from '../scripts/start-dsh.ts'
-import { DEFAULT_RUNTIME_ROOT, RUNTIME_VERSION, ensureRuntime } from '../scripts/bootstrap-runtime.mjs'
+import { DEFAULT_RUNTIME_ROOT, RUNTIME_CACHE_VERSION, RUNTIME_VERSION, ensureRuntime } from '../scripts/bootstrap-runtime.mjs'
 import { serializeResult } from '../scripts/serialize.ts'
 
 describe('Node SDK skill runner helpers', () => {
@@ -108,6 +108,8 @@ describe('Node SDK skill runner helpers', () => {
     assert.equal(launch.env.DEEPSEEK_API_KEY, 'explicit')
     assert.equal(launch.env.DSH_HOME, process.env.DSH_HOME?.trim() || join(homedir(), '.dsh'))
     assert.equal(launch.env.DSH_CWD, options.cwd)
+    assert.equal(launch.env.DSH_STORAGE_ROOT, join(launch.env.DSH_HOME, 'storages'))
+    assert.match(launch.env.DSH_WORKSPACE_BRIDGE, /workspace-bridge\.mjs$/)
     assert.equal(launch.cwd, options.cwd)
     const explicitHome = runtimeLaunch(parseArgs(['--task', 'x', '--env', 'DSH_HOME=/custom/dsh-home']))
     assert.equal(explicitHome.env.DSH_HOME, '/custom/dsh-home')
@@ -258,6 +260,16 @@ describe('Node SDK skill runner helpers', () => {
       assert.equal(runtime.ready, false)
       assert.match(runtime.cordis, /cordis\.yml$/)
       assert.match(RUNTIME_VERSION, /^0\.0\.1-/)
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
+  it('exposes the workspace bridge in the packaged runtime contract', async () => {
+    const directory = await mkdtemp(join(process.cwd(), 'tmp-runtime-workspace-'))
+    try {
+      const runtime = await ensureRuntime(directory, { install: false })
+      assert.equal(RUNTIME_VERSION, '0.0.1-rc.5')
+      assert.equal(RUNTIME_CACHE_VERSION, 'workspace-bridge-1')
+      assert.match(runtime.workspaceBridge, /workspace-bridge\.mjs$/)
     } finally { await rm(directory, { recursive: true, force: true }) }
   })
 })
