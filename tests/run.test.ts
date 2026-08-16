@@ -76,6 +76,15 @@ describe('Node SDK skill runner helpers', () => {
     assert.doesNotMatch(skill, /DEEPSEEK_API_KEY|API key|api key/)
   })
 
+  it('documents user installation and the copyable agent setup prompt', async () => {
+    const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8')
+    assert.match(readme, /npx --yes skills add x22x22\/deepseek-harness-subagent/)
+    assert.match(readme, /model-selection-required/)
+    assert.match(readme, /完整 models 列表/)
+    assert.match(readme, /configure\.mjs/)
+    assert.match(readme, /--task-file/)
+  })
+
   it('supports structured input and disabling idle timeout', () => {
     const options = parseArgs(['--input-json', '[{"type":"text","text":"x"}]', '--no-idle-timeout'])
     assert.equal(options.idleTimeoutSeconds, 0)
