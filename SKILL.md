@@ -5,7 +5,7 @@ description: Delegate an independent coding or analysis task to the local DeepSe
 
 # DeepSeek Harness Node 子代理
 
-这个 skill 使用 dsh 官方 `@deepseek-ai/dsh-sdk-client` TypeScript SDK，不使用 Python SDK。Node SDK 与 dsh 内部协议和测试保持同仓库一致。运行脚本通过 `tsx` 加载 dsh 源码 runtime，默认使用 `examples/jsonrpc-agent/cordis.yml`。
+这个 skill 使用 dsh 官方 `@deepseek-ai/dsh-sdk-client` TypeScript SDK，不使用 Python SDK。首次调用时脚本会自动把固定版本的官方 Node runtime 和必要插件安装到 `~/.cache/deepseek-harness-subagent/runtime/`，后续复用缓存；不要求用户拥有 dsh 源码仓库，也不要求手动执行 npm/pnpm 安装。
 
 SDK 直接调用 JSON-RPC runtime，不要求先启动 `dsh web`。使用本机 Web profile 中的 `modlens`、`vision-router`、`llm-pi-ai` 等动态 provider 时，也不要求 Web 进程保持运行；只要插件已经安装/构建，并通过包含这些插件的独立 Cordis 组合加载即可。统一使用底层脚本检查/启动 Web（仅在确实需要 Web UI 或确认 profile 安装状态时使用）：
 
@@ -41,8 +41,7 @@ dsh 当前官方 DeepSeek provider 的基础模型为：
 用户选择后执行：
 
 ```sh
-pnpm --dir /Users/kdump/llm/project/official/deepseek-harness exec tsx \
-  /Users/kdump/llm/skills/deepseek-harness-subagent/scripts/configure.ts \
+node <skill-dir>/scripts/configure.mjs \
   --set-model deepseek-official/deepseek-v4-flash --reasoning-effort high
 ```
 
@@ -68,18 +67,15 @@ pnpm --dir /Users/kdump/llm/project/official/deepseek-harness exec tsx \
 ## 常用命令
 
 ```sh
-# 检查 Node SDK、runtime 源码、Cordis 配置和 tsx
-pnpm --dir /Users/kdump/llm/project/official/deepseek-harness exec tsx \
-  /Users/kdump/llm/project/official/deepseek-harness/.agents/skills/deepseek-harness-subagent/scripts/healthcheck.ts
+# 检查并自动准备 Node SDK、runtime、Cordis 配置和 tsx
+node <skill-dir>/scripts/healthcheck.mjs
 
 # 一次性任务（仍然使用 Node SDK）
-pnpm --dir /Users/kdump/llm/project/official/deepseek-harness exec tsx \
-  /Users/kdump/llm/project/official/deepseek-harness/.agents/skills/deepseek-harness-subagent/scripts/delegate.ts \
+node <skill-dir>/scripts/session.mjs \
   --cwd "$PWD" --task '检查 src/ 下的回归并修复，运行最小相关测试。'
 
 # 同一 session 多轮，默认 1 小时 idle timeout
-pnpm --dir /Users/kdump/llm/project/official/deepseek-harness exec tsx \
-  /Users/kdump/llm/project/official/deepseek-harness/.agents/skills/deepseek-harness-subagent/scripts/session.ts \
+node <skill-dir>/scripts/session.mjs \
   --session-id review-42 --session-root "$PWD/.dsh-sessions" --cwd "$PWD" \
   --stream-events --task '先检查实现' --task '再运行最小测试并汇报结果'
 
@@ -90,7 +86,7 @@ pnpm --dir /Users/kdump/llm/project/official/deepseek-harness exec tsx \
 .../session.ts --cordis /absolute/path/to/agent-composition.cordis.yml --task '...'
 ```
 
-脚本通过 Node SDK 的 `DeepSeekHarness`/`HarnessClient` 启动 dsh runtime；子进程 cwd、`DSH_CWD`、`CODEX_PARENT_CWD` 和任务上下文使用同一个绝对路径。默认 runtime 为 `packages/examples/jsonrpc-demo/src/bin.ts`，通过 `TSX_TSCONFIG_PATH` 解析同仓库 TypeScript 包；`.ts` runtime 使用 tsx，`.js/.mjs/.cjs` 使用 Node，其他扩展名按可执行文件直接启动；可用 `--runtime-bin` 替换。API key 只通过清理后的子进程环境传递，不写入结果。
+脚本通过 Node SDK 的 `DeepSeekHarness`/`HarnessClient` 启动缓存中的 dsh runtime；子进程 cwd、`DSH_CWD`、`CODEX_PARENT_CWD` 和任务上下文使用同一个绝对路径。API key 只通过清理后的子进程环境传递，不写入结果。
 
 ## 参数和失败处理
 

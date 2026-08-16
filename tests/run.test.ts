@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { DEFAULT_IDLE_TIMEOUT_SECONDS, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
 import { CURRENT_MODELS, localModelOptions, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
 import { parseArgs as parseStartArgs, processMatches } from '../scripts/start-dsh.ts'
+import { DEFAULT_RUNTIME_ROOT, RUNTIME_VERSION, ensureRuntime } from '../scripts/bootstrap-runtime.mjs'
 
 describe('Node SDK skill runner helpers', () => {
   it('uses one hour idle timeout and parses repeated tasks', () => {
@@ -92,7 +93,7 @@ describe('Node SDK skill runner helpers', () => {
     assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /models 列表告知用户/)
     assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /Flash \+ 视觉组合/)
     assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /只有没有视觉组合时才推荐官方 Flash/)
-    assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /configure\.ts --set-model MODEL/)
+    assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /configure\.mjs --set-model MODEL/)
   })
 
   it('discovers local pi-ai and vision routes without exposing credentials', async () => {
@@ -128,6 +129,18 @@ describe('Node SDK skill runner helpers', () => {
         'deepseek-official/deepseek-v4-flash',
         'deepseek-official/deepseek-v4-pro',
       ])
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
+  it('uses a stable default cache and reports an unbootstrapped runtime without installing', async () => {
+    assert.match(DEFAULT_RUNTIME_ROOT, /deepseek-harness-subagent\/runtime$/)
+    const directory = await mkdtemp(join(process.cwd(), 'tmp-runtime-probe-'))
+    try {
+      const runtime = await ensureRuntime(directory, { install: false })
+      assert.equal(runtime.cached, false)
+      assert.equal(runtime.ready, false)
+      assert.match(runtime.cordis, /cordis\.yml$/)
+      assert.match(RUNTIME_VERSION, /^0\.0\.1-/)
     } finally { await rm(directory, { recursive: true, force: true }) }
   })
 })

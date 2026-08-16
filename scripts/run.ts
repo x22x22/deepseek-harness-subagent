@@ -2,19 +2,16 @@
 /** Node/TypeScript SDK runner used by the Codex deepseek-harness skill. */
 
 import { readFile, stat } from 'node:fs/promises'
-import { extname, resolve } from 'node:path'
+import { extname, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import process from 'node:process'
-import {
-  DeepSeekHarness,
-  type ContentBlock,
-  type HarnessNotification,
-  type RunResult,
-} from '@deepseek-ai/dsh-sdk-client'
+import type { ContentBlock, HarnessNotification, RunResult } from '@deepseek-ai/dsh-sdk-client'
 import { modelConfigPath, modelOptions, readModelConfig, type StoredModelConfig } from './model-config.ts'
 
 export const DEFAULT_REPO = '/Users/kdump/llm/project/official/deepseek-harness'
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 3600
-export const MODEL_SELECTION_AGENT_INSTRUCTION = '必须先把 models 列表告知用户；如果存在视觉路由，优先推荐 Flash + 视觉组合（modlens vision、自动识图或 modlens vision + 自动识图），只有没有视觉组合时才推荐官方 Flash；同时请求用户选择思考程度 off/high/max。用户选择后运行 scripts/configure.ts --set-model MODEL --reasoning-effort LEVEL 保存配置，再重新执行原任务。未完成选择前不得猜测模型或继续调用 subagent。'
+export const MODEL_SELECTION_AGENT_INSTRUCTION = '必须先把 models 列表告知用户；如果存在视觉路由，优先推荐 Flash + 视觉组合（modlens vision、自动识图或 modlens vision + 自动识图），只有没有视觉组合时才推荐官方 Flash；同时请求用户选择思考程度 off/high/max。用户选择后运行 scripts/configure.mjs --set-model MODEL --reasoning-effort LEVEL 保存配置，再重新执行原任务。未完成选择前不得猜测模型或继续调用 subagent。'
+type DeepSeekHarness = import('@deepseek-ai/dsh-sdk-client').DeepSeekHarness
 
 export class IdleTimeoutError extends Error {
   constructor(public readonly idleTimeoutSeconds: number) {
@@ -128,8 +125,8 @@ export function parseArgs(argv: string[]): CliOptions {
   const tasks: Array<string | ContentBlock[]> = []
   const envValues: string[] = []
   let cwd = process.cwd()
-  let repo = DEFAULT_REPO
-  let cordis: string | undefined
+  let repo = process.env.DSH_PACKAGED_RUNTIME_ROOT ?? DEFAULT_REPO
+  let cordis: string | undefined = process.env.DSH_PACKAGED_CORDIS
   let sessionId = 'codex-subagent'
   let sessionRoot: string | undefined
   let provider = 'deepseek-official'
@@ -138,7 +135,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let maxTokens: number | undefined
   let requestTimeoutMs: number | undefined
   let idleTimeoutSeconds = DEFAULT_IDLE_TIMEOUT_SECONDS
-  let runtimeBin: string | undefined
+  let runtimeBin: string | undefined = process.env.DSH_PACKAGED_RUNTIME_BIN
   let baseUrl: string | undefined
   let apiKey: string | undefined
   let stdin = false
@@ -278,6 +275,10 @@ async function runWithIdleTimeout(
 }
 
 export async function run(options: CliOptions): Promise<Record<string, unknown>> {
+  const sdkEntry = process.env.DSH_RUNTIME_NODE_MODULES
+    ? pathToFileURL(join(process.env.DSH_RUNTIME_NODE_MODULES, '@deepseek-ai', 'dsh-sdk-client', 'lib', 'index.js')).href
+    : '@deepseek-ai/dsh-sdk-client'
+  const { DeepSeekHarness } = await import(sdkEntry)
   const tasks = options.tasks[0] === '' ? [await readFile(0, 'utf8')] : options.tasks
   if (tasks.length === 0 || tasks.some((task) => typeof task === 'string' && !task.trim())) throw new Error('task must not be blank')
   const storedConfig = await readModelConfig()
