@@ -78,6 +78,8 @@ describe('Node SDK skill runner helpers', () => {
       assert.equal(saved.reasoningEffort, 'high')
       assert.match(await readFile(path, 'utf8'), /deepseek-v4-pro/)
       assert.doesNotMatch(await readFile(path, 'utf8'), /API_KEY|SECRET|PASSWORD/)
+      const derived = await writeModelConfig('deepseek-modlens/deepseek-v4-flash', 'deepseek-official', path)
+      assert.deepEqual(derived, { version: 1, provider: 'deepseek-modlens', model: 'deepseek-v4-flash', reasoningEffort: 'high' })
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

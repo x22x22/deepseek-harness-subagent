@@ -125,7 +125,9 @@ export async function readModelConfig(path = modelConfigPath()): Promise<StoredM
 }
 
 export async function writeModelConfig(model: string, provider = 'deepseek-official', path = modelConfigPath(), reasoningEffort: StoredModelConfig['reasoningEffort'] = 'high'): Promise<StoredModelConfig> {
-  const selected = findModel(model)
+  const selected = model.includes('/')
+    ? findModel(model)
+    : modelOptions().find((candidate) => candidate.provider === provider && candidate.id === model) ?? findModel(model)
   if (!selected) throw new Error(`unknown model ${JSON.stringify(model)}; run --list-models first`)
   const config: StoredModelConfig = { version: 1, provider: selected.provider, model: selected.id, reasoningEffort }
   await mkdir(dirname(path), { recursive: true })
