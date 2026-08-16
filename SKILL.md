@@ -14,6 +14,8 @@ dsh 当前官方 DeepSeek provider 可选模型为：
 - `deepseek-v4-flash`（DeepSeek-V4-Flash，1,000,000 token 上下文，默认快速模型）
 - `deepseek-v4-pro`（DeepSeek-V4-Pro，1,000,000 token 上下文，复杂推理优先）
 
+以上是 dsh 官方 adapter 的默认 catalog；自定义 Cordis/settings 可以替换或增加模型。自定义模型不要写入默认选择器时，可直接用显式 `--model` 或 `DSH_MODEL`。
+
 首次使用且没有显式 `--model`、`DSH_MODEL` 或持久配置时，脚本会返回 `status=model-selection-required` 和模型列表。主 agent 必须把这两个选项告知用户，请用户选择后执行：
 
 ```sh
