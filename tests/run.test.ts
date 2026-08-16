@@ -29,6 +29,14 @@ describe('Node SDK skill runner helpers', () => {
     assert.match(await serializeResult({ status: 'completed' }, 'json'), /^\{"status":"completed"\}\n$/)
   })
 
+  it('documents adaptive delegation guidance and clarification constraints', async () => {
+    const skill = await readFile(new URL('../SKILL.md', import.meta.url), 'utf8')
+    assert.match(skill, /自适应传递信息/)
+    assert.match(skill, /tmp\/subagent-context\.md/)
+    assert.match(skill, /禁止调用 `ask_user_question`/)
+    assert.match(skill, /言简意赅/)
+  })
+
   it('supports structured input and disabling idle timeout', () => {
     const options = parseArgs(['--input-json', '[{"type":"text","text":"x"}]', '--no-idle-timeout'])
     assert.equal(options.idleTimeoutSeconds, 0)

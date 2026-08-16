@@ -68,7 +68,7 @@ node <skill-dir>/scripts/session.mjs \
 
 错误状态为 `model-selection-required` 时：
 
-1. 把返回 JSON 中完整的 `models` 列表告知用户。
+1. 把返回 TOON（或显式 JSON）中的完整 `models` 列表告知用户。
 2. 有视觉路由时优先推荐 Flash + 视觉组合；没有视觉路由时推荐官方 Flash。
 3. 同时让用户选择 `off`、`high` 或 `max` 思考程度。
 4. 用户选择后执行：
