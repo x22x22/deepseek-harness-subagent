@@ -1,0 +1,65 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import { DEFAULT_IDLE_TIMEOUT_SECONDS, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
+
+describe('Node SDK skill runner helpers', () => {
+  it('uses one hour idle timeout and parses repeated tasks', () => {
+    const options = parseArgs(['--task', 'one', '--task', 'two'])
+    assert.equal(options.idleTimeoutSeconds, DEFAULT_IDLE_TIMEOUT_SECONDS)
+    assert.deepEqual(options.tasks, ['one', 'two'])
+  })
+
+  it('supports structured input and disabling idle timeout', () => {
+    const options = parseArgs(['--input-json', '[{"type":"text","text":"x"}]', '--no-idle-timeout'])
+    assert.equal(options.idleTimeoutSeconds, 0)
+    assert.deepEqual(options.tasks, [[{ type: 'text', text: 'x' }]])
+  })
+
+  it('keeps Python-compatible URL/key and cwd-announcement controls', () => {
+    const options = parseArgs([
+      '--task', 'x', '--base-url', 'https://gateway.example/v1', '--api-key', 'explicit', '--no-announce-cwd',
+    ])
+    assert.equal(options.announceCwd, false)
+    const launch = runtimeLaunch(options)
+    assert.equal(launch.env.DEEPSEEK_BASE_URL, 'https://gateway.example/v1')
+    assert.equal(launch.env.DEEPSEEK_API_KEY, 'explicit')
+    assert.equal(launch.env.DSH_CWD, options.cwd)
+    assert.equal(launch.cwd, options.cwd)
+  })
+
+  it('keeps the Python request-timeout spelling as seconds', () => {
+    assert.equal(parseArgs(['--task', 'x', '--request-timeout', '2']).requestTimeoutMs, 2000)
+  })
+
+  it('rejects invalid task source and timeout values', () => {
+    assert.throws(() => parseArgs([]), /required/)
+    assert.throws(() => parseArgs(['--task', 'x', '--stdin']), /combined/)
+    assert.throws(() => parseArgs(['--task', 'x', '--idle-timeout', '-1']), /non-negative/)
+    assert.throws(() => parseArgs(['--task', 'x', '--request-timeout-ms', '0']), /positive/)
+  })
+
+  it('scrubs inherited credentials but accepts explicit overrides', () => {
+    assert.deepEqual(scrubEnvironment({ SAFE: 'yes', DEEPSEEK_API_KEY: 'secret', EMPTY: undefined }), { SAFE: 'yes' })
+    assert.deepEqual(parseEnv(['DEEPSEEK_API_KEY=explicit', 'A=B=C']), { DEEPSEEK_API_KEY: 'explicit', A: 'B=C' })
+  })
+
+  it('announces the exact cwd for text and structured tasks', () => {
+    assert.match(announceCwd('task', '/workspace') as string, /Current working directory \(cwd\): \/workspace/)
+    assert.deepEqual(announceCwd([{ type: 'text', text: 'task' }], '/workspace'), [
+      { type: 'text', text: '[Codex parent execution context]\nCurrent working directory (cwd): /workspace\n' },
+      { type: 'text', text: 'task' },
+    ])
+  })
+
+  it('derives finish reason and exposes the protocol capability gaps', () => {
+    assert.equal(finishReason([
+      { type: 'turn/end', data: { reason: { kind: 'max-tokens' } } },
+      { type: 'turn/end', data: { reason: { kind: 'completed' } } },
+    ]), 'completed')
+    assert.equal(finishReason([{ type: 'assistant/message', data: {} }]), undefined)
+    const matrix = capabilityMatrix(3600)
+    assert.equal(matrix.supported.finish_reason, 'derived from root turn/end events')
+    assert.match(String(matrix.supported.idle_timeout), /3600/)
+    assert.match(String(matrix.unsupported_by_current_sdk_wire.agent_name_or_preset_selector), /agentPreset/)
+  })
+})
