@@ -90,6 +90,8 @@ node <skill-dir>/scripts/session.mjs \
 
 ## 参数和失败处理
 
+遇到任何执行失败、runtime/import 错误、模型 adapter 错误、cwd 不一致或 idle timeout，必须先阅读并执行 `references/troubleshooting.md` 中的对应排查流程，完成自动修复和最小短任务复测后，再恢复原任务或向用户报告。不要把一次超时或非零退出直接判定为子 agent 失败。
+
 - `--task` 可重复；也可用 `--input-json` 传 SDK 原生 content blocks，或用 `--stdin` 读取长任务；三者不能混用。
 - `--cwd` 默认继承调用方当前 cwd；不要把生产目录作为默认工作目录。
 - `--session-id` 与 `--session-root` 用于多轮恢复；不要把不同 cwd 复用到同一个 session ID。
