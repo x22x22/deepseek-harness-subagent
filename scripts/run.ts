@@ -14,6 +14,7 @@ import { CURRENT_MODELS, modelConfigPath, readModelConfig } from './model-config
 
 export const DEFAULT_REPO = '/Users/kdump/llm/project/official/deepseek-harness'
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 3600
+export const MODEL_SELECTION_AGENT_INSTRUCTION = '必须先把 models 列表告知用户并请求选择一个默认模型；用户选择后运行 scripts/configure.ts --set-model MODEL 保存配置，再重新执行原任务。未完成选择前不得猜测模型或继续调用 subagent。'
 
 export class IdleTimeoutError extends Error {
   constructor(public readonly idleTimeoutSeconds: number) {
@@ -344,10 +345,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     else process.stdout.write(`${JSON.stringify(result)}\n`)
   } catch (error) {
     const timeout = error instanceof IdleTimeoutError
+    const modelRequired = error instanceof ModelSelectionRequiredError
     process.stdout.write(`${JSON.stringify({
-      status: timeout ? 'idle-timeout' : 'error',
+      status: timeout ? 'idle-timeout' : modelRequired ? 'model-selection-required' : 'error',
       errorType: error instanceof Error ? error.name : 'Error',
       error: String(error),
+      agentInstruction: modelRequired ? MODEL_SELECTION_AGENT_INSTRUCTION : undefined,
+      models: modelRequired ? error.models : undefined,
+      configPath: modelRequired ? error.configPath : undefined,
       nextAction: timeout ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试' : undefined,
     })}\n`)
     process.exitCode = 1

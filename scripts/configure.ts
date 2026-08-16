@@ -11,6 +11,7 @@ function printModels(): void {
     provider: 'deepseek-official',
     models: CURRENT_MODELS,
     source: 'packages/llm/llm-deepseek/src/index.ts',
+    agentInstruction: '请选择一个 model，并使用 --set-model MODEL 保存默认配置；未配置前，session/delegate/healthcheck 会拒绝继续调用 subagent。',
   }, null, 2)}\n`)
 }
 
@@ -36,7 +37,7 @@ try {
     const model = findModel(selected)
     if (!model) throw new Error(`unknown model ${JSON.stringify(selected)}; use --list-models`)
     const config = await writeModelConfig(model.id, 'deepseek-official', configPath)
-    process.stdout.write(`${JSON.stringify({ status: 'configured', configPath, config }, null, 2)}\n`)
+    process.stdout.write(`${JSON.stringify({ status: 'configured', configPath, config, nextAction: '可重新执行 scripts/healthcheck.ts，然后再运行 session.ts 或 delegate.ts' }, null, 2)}\n`)
   }
   if (!list && !show && selected === undefined) help()
 } catch (error) {

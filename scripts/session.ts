@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import process from 'node:process'
-import { IdleTimeoutError, ModelSelectionRequiredError, parseArgs, run } from './run.ts'
+import { IdleTimeoutError, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, parseArgs, run } from './run.ts'
 
 try {
   const options = parseArgs(process.argv.slice(2))
@@ -19,6 +19,7 @@ try {
     error: String(error),
     configPath: modelRequired ? error.configPath : undefined,
     models: modelRequired ? error.models : undefined,
+    agentInstruction: modelRequired ? MODEL_SELECTION_AGENT_INSTRUCTION : undefined,
     nextAction: timeout
       ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试'
       : modelRequired ? '先从 models 中选择模型并运行 scripts/configure.ts --set-model MODEL' : undefined,

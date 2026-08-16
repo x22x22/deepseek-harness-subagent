@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import { join } from 'node:path'
-import { DEFAULT_IDLE_TIMEOUT_SECONDS, ModelSelectionRequiredError, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
+import { DEFAULT_IDLE_TIMEOUT_SECONDS, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
 import { CURRENT_MODELS, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
 
 describe('Node SDK skill runner helpers', () => {
@@ -84,5 +84,7 @@ describe('Node SDK skill runner helpers', () => {
     const error = new ModelSelectionRequiredError('/home/user/.config/deepseek-harness-subagent/config.json')
     assert.equal(error.configPath, '/home/user/.config/deepseek-harness-subagent/config.json')
     assert.deepEqual(error.models.map((model) => model.id), ['deepseek-v4-flash', 'deepseek-v4-pro'])
+    assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /models 列表告知用户/)
+    assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /configure\.ts --set-model MODEL/)
   })
 })
