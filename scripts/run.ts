@@ -10,6 +10,7 @@ import {
   type HarnessNotification,
   type RunResult,
 } from '@deepseek-ai/dsh-sdk-client'
+import { CURRENT_MODELS, modelConfigPath, readModelConfig } from './model-config.ts'
 
 export const DEFAULT_REPO = '/Users/kdump/llm/project/official/deepseek-harness'
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 3600
@@ -21,6 +22,15 @@ export class IdleTimeoutError extends Error {
   }
 }
 
+export class ModelSelectionRequiredError extends Error {
+  public readonly models = CURRENT_MODELS
+
+  constructor(public readonly configPath: string) {
+    super(`default model is not configured; choose one and save it with scripts/configure.ts --set-model MODEL (config: ${configPath})`)
+    this.name = 'ModelSelectionRequiredError'
+  }
+}
+
 export interface CliOptions {
   tasks: Array<string | ContentBlock[]>
   cwd: string
@@ -29,7 +39,7 @@ export interface CliOptions {
   sessionId: string
   sessionRoot?: string
   provider: string
-  model: string
+  model?: string
   maxTokens?: number
   requestTimeoutMs?: number
   idleTimeoutSeconds: number
@@ -121,7 +131,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let sessionId = 'codex-subagent'
   let sessionRoot: string | undefined
   let provider = 'deepseek-official'
-  let model = process.env.DSH_MODEL ?? 'deepseek-v4-flash'
+  let model = process.env.DSH_MODEL
   let maxTokens: number | undefined
   let requestTimeoutMs: number | undefined
   let idleTimeoutSeconds = DEFAULT_IDLE_TIMEOUT_SECONDS
@@ -214,7 +224,9 @@ export function runtimeLaunch(options: CliOptions): { command: string; args: str
     ...(options.sessionRoot === undefined ? {} : { DSH_SESSION_ROOT: options.sessionRoot }),
   }
   if (extname(runtime) === '.ts') {
-    return { command: process.execPath, args: ['--import', import.meta.resolve('tsx'), runtime], cwd: options.cwd, env }
+    // Resolve tsx from the dsh repository, not from the installed skill's directory.
+    // The skill itself lives outside the workspace node_modules tree.
+    return { command: 'pnpm', args: ['--dir', options.repo, 'exec', 'tsx', runtime], cwd: options.cwd, env }
   }
   if (extname(runtime) === '.js' || extname(runtime) === '.mjs' || extname(runtime) === '.cjs') {
     return { command: process.execPath, args: [runtime], cwd: options.cwd, env }
@@ -262,6 +274,10 @@ async function runWithIdleTimeout(
 export async function run(options: CliOptions): Promise<Record<string, unknown>> {
   const tasks = options.tasks[0] === '' ? [await readFile(0, 'utf8')] : options.tasks
   if (tasks.length === 0 || tasks.some((task) => typeof task === 'string' && !task.trim())) throw new Error('task must not be blank')
+  const storedConfig = await readModelConfig()
+  const model = options.model ?? storedConfig?.model
+  if (!model) throw new ModelSelectionRequiredError(modelConfigPath())
+  const provider = options.provider !== 'deepseek-official' ? options.provider : (storedConfig?.provider ?? options.provider)
   const [cwdInfo, repoInfo, cordisInfo, runtimeInfo] = await Promise.all([
     stat(options.cwd),
     stat(options.repo),
@@ -279,8 +295,8 @@ export async function run(options: CliOptions): Promise<Record<string, unknown>>
       ...(options.requestTimeoutMs === undefined ? {} : { requestTimeoutMs: options.requestTimeoutMs }),
     },
     cwd: options.cwd,
-    provider: options.provider,
-    model: options.model,
+    provider,
+    model,
     ...(options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }),
   })
   const turns: Array<Record<string, unknown>> = []
@@ -314,8 +330,8 @@ export async function run(options: CliOptions): Promise<Record<string, unknown>>
     repo: options.repo,
     cordis: options.cordis,
     runtimeBin: runtimePath(options),
-    provider: options.provider,
-    model: options.model,
+    provider,
+    model,
     capabilities: capabilityMatrix(options.idleTimeoutSeconds),
   }
 }

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { describe, it } from 'node:test'
-import { DEFAULT_IDLE_TIMEOUT_SECONDS, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
+import { join } from 'node:path'
+import { DEFAULT_IDLE_TIMEOUT_SECONDS, ModelSelectionRequiredError, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
+import { CURRENT_MODELS, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
 
 describe('Node SDK skill runner helpers', () => {
   it('uses one hour idle timeout and parses repeated tasks', () => {
@@ -61,5 +64,25 @@ describe('Node SDK skill runner helpers', () => {
     assert.equal(matrix.supported.finish_reason, 'derived from root turn/end events')
     assert.match(String(matrix.supported.idle_timeout), /3600/)
     assert.match(String(matrix.unsupported_by_current_sdk_wire.agent_name_or_preset_selector), /agentPreset/)
+  })
+
+  it('persists and reloads the selected default model without secrets', async () => {
+    const directory = await mkdtemp(join(process.cwd(), 'tmp-model-config-'))
+    const path = join(directory, 'config.json')
+    try {
+      assert.equal(CURRENT_MODELS.length, 2)
+      const saved = await writeModelConfig('deepseek-v4-pro', 'deepseek-official', path)
+      assert.deepEqual(await readModelConfig(path), saved)
+      assert.match(await readFile(path, 'utf8'), /deepseek-v4-pro/)
+      assert.doesNotMatch(await readFile(path, 'utf8'), /API_KEY|SECRET|PASSWORD/)
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('represents first-use model selection as a recoverable state', () => {
+    const error = new ModelSelectionRequiredError('/home/user/.config/deepseek-harness-subagent/config.json')
+    assert.equal(error.configPath, '/home/user/.config/deepseek-harness-subagent/config.json')
+    assert.deepEqual(error.models.map((model) => model.id), ['deepseek-v4-flash', 'deepseek-v4-pro'])
   })
 })

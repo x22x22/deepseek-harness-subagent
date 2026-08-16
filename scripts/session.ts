@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import process from 'node:process'
-import { IdleTimeoutError, parseArgs, run } from './run.ts'
+import { IdleTimeoutError, ModelSelectionRequiredError, parseArgs, run } from './run.ts'
 
 try {
   const options = parseArgs(process.argv.slice(2))
@@ -12,11 +12,16 @@ try {
   }
 } catch (error) {
   const timeout = error instanceof IdleTimeoutError
+  const modelRequired = error instanceof ModelSelectionRequiredError
   process.stdout.write(`${JSON.stringify({
-    status: timeout ? 'idle-timeout' : 'error',
+    status: timeout ? 'idle-timeout' : modelRequired ? 'model-selection-required' : 'error',
     errorType: error instanceof Error ? error.name : 'Error',
     error: String(error),
-    nextAction: timeout ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试' : undefined,
+    configPath: modelRequired ? error.configPath : undefined,
+    models: modelRequired ? error.models : undefined,
+    nextAction: timeout
+      ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试'
+      : modelRequired ? '先从 models 中选择模型并运行 scripts/configure.ts --set-model MODEL' : undefined,
   })}\n`)
   process.exitCode = 1
 }

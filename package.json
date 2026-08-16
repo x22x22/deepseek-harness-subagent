@@ -1,0 +1,5 @@
+{
+  "name": "deepseek-harness-subagent-skill",
+  "private": true,
+  "type": "module"
+}

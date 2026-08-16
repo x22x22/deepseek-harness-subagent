@@ -7,10 +7,32 @@ description: Delegate an independent coding or analysis task to the local DeepSe
 
 这个 skill 使用 dsh 官方 `@deepseek-ai/dsh-sdk-client` TypeScript SDK，不使用 Python SDK。Node SDK 与 dsh 内部协议和测试保持同仓库一致。运行脚本通过 `tsx` 加载 dsh 源码 runtime，默认使用 `examples/jsonrpc-agent/cordis.yml`。
 
+## 默认模型配置
+
+dsh 当前官方 DeepSeek provider 可选模型为：
+
+- `deepseek-v4-flash`（DeepSeek-V4-Flash，1,000,000 token 上下文，默认快速模型）
+- `deepseek-v4-pro`（DeepSeek-V4-Pro，1,000,000 token 上下文，复杂推理优先）
+
+首次使用且没有显式 `--model`、`DSH_MODEL` 或持久配置时，脚本会返回 `status=model-selection-required` 和模型列表。主 agent 必须把这两个选项告知用户，请用户选择后执行：
+
+```sh
+pnpm --dir /Users/kdump/llm/project/official/deepseek-harness exec tsx \
+  /Users/kdump/llm/skills/deepseek-harness-subagent/scripts/configure.ts \
+  --set-model deepseek-v4-flash
+```
+
+配置默认写入 `~/.config/deepseek-harness-subagent/config.json`（可用 `DSH_SUBAGENT_CONFIG` 或 `--config` 覆盖），只保存 provider/model，不保存密钥。之后用户不提模型时，自动使用该配置，不再询问；显式 `--model` 和 `DSH_MODEL` 优先级更高。查看模型和当前配置：
+
+```sh
+.../scripts/configure.ts --list-models
+.../scripts/configure.ts --show
+```
+
 ## 委托流程
 
 1. 先确认任务边界、工作目录和是否允许修改文件。不要把密钥、Cookie 或完整环境变量写入任务文本。
-2. 先执行 `scripts/healthcheck.ts`；短任务使用 `scripts/delegate.ts`，需要持久 session、多轮和事件观察时使用 `scripts/session.ts`。
+2. 首次使用先按“默认模型配置”完成选择；之后执行 `scripts/healthcheck.ts`。短任务使用 `scripts/delegate.ts`，需要持久 session、多轮和事件观察时使用 `scripts/session.ts`。
 3. 任务必须自包含，明确目标、输入路径、验证命令、禁止事项和期望输出。不要依赖父会话未传递的对话历史。
 4. 读取 JSON 结果并检查 `status`、`cwd`、`sessionId`、每个 turn 的 `finalResponse`、notification 数量和验证证据。只有 `status=completed` 才能把结果当作完成；超时、非零退出和空答案都必须报告为失败。
 5. `session.ts` 默认启用 1 小时 idle timeout：它限制连续没有 dsh notification 的时间，不是任务总时长；收到任意 notification 会刷新计时。长任务可以超过 1 小时，只要 dsh 持续有事件。
@@ -72,4 +94,4 @@ pnpm --dir /Users/kdump/llm/project/official/deepseek-harness exec tsx \
 
 不得把当前不支持的能力写进委托任务并声称已经执行。需要这些能力时，应使用原生 Codex subagent，或先扩展 dsh Node SDK/协议并补测试。
 
-详细参数见 `scripts/session.ts --help`；脚本行为由 `tests/run.test.ts` 覆盖，官方 SDK 行为由 `packages/sdk/client/tests` 覆盖。
+详细参数见 `scripts/session.ts --help` 和 `scripts/configure.ts --help`；脚本行为由 `tests/run.test.ts` 覆盖，官方 SDK 行为由 `packages/sdk/client/tests` 覆盖。
