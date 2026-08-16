@@ -108,7 +108,7 @@ node <skill-dir>/scripts/session.mjs \
 
 ## 7. cwd/workspace 不一致
 
-结果中的 `cwd`、任务开头的 `[Codex parent execution context]`、`DSH_CWD` 和子进程 cwd 必须一致。
+结果中的 `cwd`、任务开头的父 agent 执行上下文、`DSH_CWD` 和子进程 cwd 必须一致。
 
 若不一致：
 

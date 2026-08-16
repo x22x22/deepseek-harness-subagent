@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Node/TypeScript SDK runner used by the Codex deepseek-harness skill. */
+/** Node/TypeScript SDK runner used by the DeepSeek Harness subagent skill. */
 
 import { readFile, stat } from 'node:fs/promises'
 import { extname, join, resolve } from 'node:path'
@@ -80,7 +80,7 @@ export function parseEnv(values: string[]): Record<string, string> {
 }
 
 export function announceCwd(task: string | ContentBlock[], cwd: string): string | ContentBlock[] {
-  const context = `[Codex parent execution context]\nCurrent working directory (cwd): ${cwd}\n`
+  const context = `[Parent agent execution context]\nCurrent working directory (cwd): ${cwd}\n`
   return typeof task === 'string'
     ? `${context}\nTask:\n${task}`
     : [{ type: 'text', text: context }, ...task]

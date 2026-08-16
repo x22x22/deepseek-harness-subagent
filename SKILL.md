@@ -1,6 +1,6 @@
 ---
 name: deepseek-harness-subagent
-description: Delegate an independent coding or analysis task to the local DeepSeek Harness runtime through the official Node.js/TypeScript SDK. Use when a Codex subagent should work in a separate dsh process with its configured model, tools, workspace, and session boundary.
+description: Delegate an independent coding or analysis task to the local DeepSeek Harness runtime through the official Node.js/TypeScript SDK. Use when an agent should work in a separate dsh process with its configured model, tools, workspace, and session boundary.
 ---
 
 # DeepSeek Harness Node 子代理
@@ -86,7 +86,7 @@ node <skill-dir>/scripts/session.mjs \
 .../session.ts --cordis /absolute/path/to/agent-composition.cordis.yml --task '...'
 ```
 
-脚本通过 Node SDK 的 `DeepSeekHarness`/`HarnessClient` 启动缓存中的 dsh runtime；子进程 cwd、`DSH_CWD`、`CODEX_PARENT_CWD` 和任务上下文使用同一个绝对路径。API key 只通过清理后的子进程环境传递，不写入结果。
+脚本通过 Node SDK 的 `DeepSeekHarness`/`HarnessClient` 启动缓存中的 dsh runtime；子进程 cwd、`DSH_CWD`、父 agent cwd 和任务上下文使用同一个绝对路径。API key 只通过清理后的子进程环境传递，不写入结果。
 
 ## 参数和失败处理
 
@@ -97,7 +97,7 @@ node <skill-dir>/scripts/session.mjs \
 - `--cwd` 默认继承调用方当前 cwd；不要把生产目录作为默认工作目录。
 - `--session-id` 与 `--session-root` 用于多轮恢复；不要把不同 cwd 复用到同一个 session ID。
 - `--base-url`、`--api-key` 是 Python 版同等的显式模型配置入口；敏感值只进入子进程环境，不会写入结果。也可用重复的 `--env KEY=VALUE`。
-- `--no-announce-cwd` 只关闭任务文本中的 cwd 声明，进程 cwd、`DSH_CWD` 和 `CODEX_PARENT_CWD` 仍然保留。
+- `--no-announce-cwd` 只关闭任务文本中的 cwd 声明，进程 cwd、`DSH_CWD` 和父 agent cwd 仍然保留。
 - `--idle-timeout` 单位为秒，默认 `3600`；每次 dsh notification 刷新计时，`0` 禁用。`--request-timeout-ms` 是底层 JSON-RPC 请求硬超时，不能替代 idle timeout。
 - idle timeout 会关闭当前 Node SDK runtime，结果状态为 `idle-timeout`，并附带检查/恢复提示；不得把它直接当作任务失败。
 - 最终回答应保留子代理原文，同时附上运行状态、退出码或错误类型、repo/cwd/session/profile、notification 和验证命令。不要把 stderr 当成成功答案。
@@ -116,8 +116,8 @@ node <skill-dir>/scripts/session.mjs \
 | Host/Web API 的 `agentPreset` | dsh 原生支持，本 skill 未接入 | 当前 SDK initialize wire 没有 `agentPreset` |
 | 固定 agent/persona | 间接支持 | 通过独立 `--cordis` 组合文件 |
 | per-turn cancel、turn steer、approval | 不支持 | 当前 SDK wire 没有对应 RPC；关闭 runtime 是放弃路径 |
-| Codex thread archive/fork/name、usage API | 不支持 | dsh SDK 没有对应管理 RPC |
+| 宿主线程 archive/fork/name、usage API | 不支持 | dsh SDK 没有对应管理 RPC |
 
-不得把当前不支持的能力写进委托任务并声称已经执行。需要这些能力时，应使用原生 Codex subagent，或先扩展 dsh Node SDK/协议并补测试。
+不得把当前不支持的能力写进委托任务并声称已经执行。需要这些能力时，应使用宿主 agent 自身的线程能力，或先扩展 dsh Node SDK/协议并补测试。
 
 详细参数见 `scripts/session.ts --help` 和 `scripts/configure.ts --help`；脚本行为由 `tests/run.test.ts` 覆盖，官方 SDK 行为由 `packages/sdk/client/tests` 覆盖。

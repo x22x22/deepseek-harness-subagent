@@ -53,7 +53,7 @@ describe('Node SDK skill runner helpers', () => {
   it('announces the exact cwd for text and structured tasks', () => {
     assert.match(announceCwd('task', '/workspace') as string, /Current working directory \(cwd\): \/workspace/)
     assert.deepEqual(announceCwd([{ type: 'text', text: 'task' }], '/workspace'), [
-      { type: 'text', text: '[Codex parent execution context]\nCurrent working directory (cwd): /workspace\n' },
+      { type: 'text', text: '[Parent agent execution context]\nCurrent working directory (cwd): /workspace\n' },
       { type: 'text', text: 'task' },
     ])
   })

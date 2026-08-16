@@ -1,6 +1,6 @@
 interface:
   display_name: "DeepSeek Harness 子代理"
-  short_description: "让 Codex 子代理通过官方 Node SDK 调用本地 DeepSeek Harness"
+  short_description: "让 agent 通过官方 Node SDK 调用本地 DeepSeek Harness"
   default_prompt: "使用 $deepseek-harness-subagent 把这个独立任务交给本地 DeepSeek Harness，并返回带状态的结果。"
 policy:
   allow_implicit_invocation: true
