@@ -17,6 +17,8 @@ description: Run an independent task in a separate DeepSeek Harness (dsh) proces
 - `--task-file` 指向的是一次性临时文件。脚本无论发送成功、模型失败、runtime 失败还是配置失败，都会在结束路径自动删除它；调用方不要把需要长期保留的文档作为参数传入。
 - 只有脚本返回 `status=completed` 且 `answer` 非空，才算收到 dsh 回复；保留 subagent 原文。
 - 每次独立测试都必须新建调用会话并使用新的自动生成或显式 `--session-id`；只有明确要延续对话时才复用已有会话 ID。
+- 如果任务涉及图片、截图、扫描件、图表、视频帧或其他识图/视觉理解，而当前默认模型不支持视觉，必须先运行 `scripts/configure.mjs --list-models` 检查完整模型目录（包括派生模型和视觉路由），从名称或描述含 `vision`、`视觉`、`自动识图`、`modlens` 等候选中选择可用模型，并仅对当前任务用显式 `--model provider/model` 指定；不要擅自覆盖用户的默认模型配置。
+- 视觉任务必须确认实际选中的模型和 provider 支持图片输入；没有可用视觉模型时要明确报告能力缺口，不得假装已经完成识图。
 
 ## 标准流程
 

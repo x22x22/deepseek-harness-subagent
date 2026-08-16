@@ -74,6 +74,9 @@ describe('Node SDK skill runner helpers', () => {
     assert.match(skill, /必须实际运行本 skill 的脚本/)
     assert.match(skill, /任务提示词保持自包含、简短/)
     assert.doesNotMatch(skill, /DEEPSEEK_API_KEY|API key|api key/)
+    assert.match(skill, /图片、截图、扫描件、图表、视频帧/)
+    assert.match(skill, /完整模型目录（包括派生模型和视觉路由）/)
+    assert.match(skill, /不要擅自覆盖用户的默认模型配置/)
   })
 
   it('documents user installation and the copyable agent setup prompt', async () => {
@@ -83,6 +86,8 @@ describe('Node SDK skill runner helpers', () => {
     assert.match(readme, /完整 models 列表/)
     assert.match(readme, /configure\.mjs/)
     assert.match(readme, /--task-file/)
+    assert.match(readme, /需要识图/)
+    assert.match(readme, /不要覆盖默认配置/)
   })
 
   it('supports structured input and disabling idle timeout', () => {
