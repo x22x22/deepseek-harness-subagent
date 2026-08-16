@@ -17,15 +17,16 @@ try {
   ({ IdleTimeoutError, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, parseArgs, run } = await import('./run.ts'))
   const options = parseArgs(process.argv.slice(2))
   const result = await run(options)
+  const { serializeResult } = await import('./serialize.ts')
   if (options.format === 'text') {
     process.stdout.write((result.turns as Array<Record<string, unknown>>).map((turn) => String(turn.finalResponse ?? '')).join('\n\n'))
   } else {
-    process.stdout.write(`${JSON.stringify(result)}\n`)
+    process.stdout.write(await serializeResult(result, options.format))
   }
 } catch (error) {
   const timeout = IdleTimeoutError !== undefined && error instanceof IdleTimeoutError
   const modelRequired = ModelSelectionRequiredError !== undefined && error instanceof ModelSelectionRequiredError
-  process.stdout.write(`${JSON.stringify({
+  const output = {
     status: timeout ? 'idle-timeout' : modelRequired ? 'model-selection-required' : 'error',
     errorType: error instanceof Error ? error.name : 'Error',
     error: String(error),
@@ -35,6 +36,12 @@ try {
     nextAction: timeout
       ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试'
       : modelRequired ? '先从 models 中选择模型并运行 scripts/configure.mjs --set-model MODEL' : undefined,
-  })}\n`)
+  }
+  try {
+    const { serializeResult } = await import('./serialize.ts')
+    process.stdout.write(await serializeResult(output, 'toon'))
+  } catch {
+    process.stdout.write(`${JSON.stringify(output)}\n`)
+  }
   process.exitCode = 1
 }

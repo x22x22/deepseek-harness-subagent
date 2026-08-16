@@ -6,6 +6,7 @@ import { extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import process from 'node:process'
 import type { ContentBlock, HarnessNotification, RunResult } from '@deepseek-ai/dsh-sdk-client'
+import type { OutputFormat } from './serialize.ts'
 import { findModel, modelConfigPath, modelOptions, readModelConfig, type StoredModelConfig } from './model-config.ts'
 
 export const DEFAULT_REPO = '/Users/kdump/llm/project/official/deepseek-harness'
@@ -59,7 +60,7 @@ export interface CliOptions {
   streamEvents: boolean
   includeEvents: boolean
   announceCwd: boolean
-  format: 'json' | 'text'
+  format: OutputFormat
 }
 
 export function scrubEnvironment(source: NodeJS.ProcessEnv): Record<string, string> {
@@ -153,7 +154,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let streamEvents = false
   let includeEvents = false
   let announceCwdFlag = true
-  let format: 'json' | 'text' = 'json'
+  let format: OutputFormat = 'toon'
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -180,7 +181,7 @@ export function parseArgs(argv: string[]): CliOptions {
       case '--stream-events': streamEvents = true; break
       case '--include-events': includeEvents = true; break
       case '--no-announce-cwd': announceCwdFlag = false; break
-      case '--format': format = value(argv, index++, arg) as 'json' | 'text'; break
+      case '--format': format = value(argv, index++, arg) as OutputFormat; break
       case '--no-idle-timeout': idleTimeoutSeconds = 0; break
       case '--help': printHelp(); process.exit(0)
       default: throw new Error(`unknown argument: ${arg}`)
@@ -192,7 +193,7 @@ export function parseArgs(argv: string[]): CliOptions {
   if (!Number.isFinite(idleTimeoutSeconds) || idleTimeoutSeconds < 0) throw new Error('--idle-timeout must be non-negative')
   if (maxTokens !== undefined && (!Number.isSafeInteger(maxTokens) || maxTokens <= 0)) throw new Error('--max-tokens must be positive')
   if (requestTimeoutMs !== undefined && (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0)) throw new Error('--request-timeout-ms must be positive')
-  if (format !== 'json' && format !== 'text') throw new Error('--format must be json or text')
+  if (format !== 'toon' && format !== 'json' && format !== 'text') throw new Error('--format must be toon, json, or text')
   if (reasoningEffort !== undefined && !['off', 'high', 'max'].includes(reasoningEffort)) throw new Error('--reasoning-effort must be off, high, or max')
   if (stdin) tasks.push('')
   return {
@@ -220,7 +221,7 @@ export function parseArgs(argv: string[]): CliOptions {
 }
 
 function printHelp(): void {
-  process.stdout.write(`Node SDK DeepSeek Harness runner\n\n--task TEXT (repeatable) | --input-json JSON | --stdin\n--cwd PATH --repo PATH --cordis PATH --session-id ID --session-root PATH\n--provider NAME --model NAME --reasoning-effort off|high|max --max-tokens N --request-timeout SECONDS\n--request-timeout-ms MS --idle-timeout SECONDS (default 3600; 0 disables)\n--runtime-bin PATH --base-url URL --api-key KEY --env KEY=VALUE\n--no-announce-cwd --stream-events --include-events --format json|text\n`)
+  process.stdout.write(`Node SDK DeepSeek Harness runner\n\n--task TEXT (repeatable) | --input-json JSON | --stdin\n--cwd PATH --repo PATH --cordis PATH --session-id ID --session-root PATH\n--provider NAME --model NAME --reasoning-effort off|high|max --max-tokens N --request-timeout SECONDS\n--request-timeout-ms MS --idle-timeout SECONDS (default 3600; 0 disables)\n--runtime-bin PATH --base-url URL --api-key KEY --env KEY=VALUE\n--no-announce-cwd --stream-events --include-events --format toon|json|text (default toon)\n`)
 }
 
 function runtimePath(options: CliOptions): string {
@@ -374,11 +375,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const options = parseArgs(process.argv.slice(2))
     const result = await run(options)
     if (options.format === 'text') process.stdout.write(options.tasks.map(() => String((result.turns as Array<Record<string, unknown>>).at(-1)?.finalResponse ?? '')).join('\n\n'))
-    else process.stdout.write(`${JSON.stringify(result)}\n`)
+    else {
+      const { serializeResult } = await import('./serialize.ts')
+      process.stdout.write(await serializeResult(result, options.format))
+    }
   } catch (error) {
     const timeout = error instanceof IdleTimeoutError
     const modelRequired = error instanceof ModelSelectionRequiredError
-    process.stdout.write(`${JSON.stringify({
+    const output = {
       status: timeout ? 'idle-timeout' : modelRequired ? 'model-selection-required' : 'error',
       errorType: error instanceof Error ? error.name : 'Error',
       error: String(error),
@@ -386,7 +390,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       models: modelRequired ? error.models : undefined,
       configPath: modelRequired ? error.configPath : undefined,
       nextAction: timeout ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试' : undefined,
-    })}\n`)
+    }
+    const { serializeResult } = await import('./serialize.ts')
+    process.stdout.write(await serializeResult(output, 'toon'))
     process.exitCode = 1
   }
 }

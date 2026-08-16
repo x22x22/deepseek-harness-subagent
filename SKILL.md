@@ -60,7 +60,7 @@ node <skill-dir>/scripts/configure.mjs \
 1. 先确认任务边界、工作目录和是否允许修改文件。不要把密钥、Cookie 或完整环境变量写入任务文本。
 2. 首次使用先按“默认模型配置”完成选择；之后执行 `scripts/healthcheck.ts`。短任务使用 `scripts/delegate.ts`，需要持久 session、多轮和事件观察时使用 `scripts/session.ts`。
 3. 任务必须自包含，明确目标、输入路径、验证命令、禁止事项和期望输出。不要依赖父会话未传递的对话历史。
-4. 读取 JSON 结果并检查 `status`、`cwd`、`sessionId`、每个 turn 的 `finalResponse`、notification 数量和验证证据。只有 `status=completed` 才能把结果当作完成；超时、非零退出和空答案都必须报告为失败。
+4. 读取默认 TOON 结果（或显式 `--format json` 的 JSON 结果），检查 `status`、`cwd`、`sessionId`、每个 turn 的 `finalResponse`、notification 数量和验证证据。只有 `status=completed` 才能把结果当作完成；超时、非零退出和空答案都必须报告为失败。
 5. `session.ts` 默认启用 1 小时 idle timeout：它限制连续没有 dsh notification 的时间，不是任务总时长；收到任意 notification 会刷新计时。长任务可以超过 1 小时，只要 dsh 持续有事件。
 6. 若发生 `status=idle-timeout`，不能直接断言 subagent 或任务失败。主 agent 必须先检查子 agent 进程/退出状态、stderr、最近的 notifications、session JSONL、工作目录变更和相关测试，判断是模型/网关卡住、runtime 崩溃、工具调用阻塞还是任务仍在执行；确认确有问题后先修复问题，再重新执行推荐任务或从同一 session 恢复。完成这些检查后才能向用户报告失败。
 
@@ -93,7 +93,8 @@ node <skill-dir>/scripts/session.mjs \
 遇到任何执行失败、runtime/import 错误、模型 adapter 错误、cwd 不一致或 idle timeout，必须先阅读并执行 `references/troubleshooting.md` 中的对应排查流程，完成自动修复和最小短任务复测后，再恢复原任务或向用户报告。不要把一次超时或非零退出直接判定为子 agent 失败。
 
 - `--task` 可重复；也可用 `--input-json` 传 SDK 原生 content blocks，或用 `--stdin` 读取长任务；三者不能混用。
-- 默认 JSON 结果只返回最终答案、finish reason、cwd、session 和 notification/event 数量，不返回完整事件数组，以避免长任务消耗大量上下文；只有排查协议或工具链问题时才加 `--include-events`，需要实时观察时再加 `--stream-events`。
+- 默认返回 TOON（由官方 `@toon-format/toon` 编码器生成），只包含最终答案、finish reason、cwd、session 和 notification/event 数量，不返回完整事件数组，以避免长任务消耗大量上下文；需要兼容旧 JSON 调用方时显式加 `--format json`。只有排查协议或工具链问题时才加 `--include-events`，需要实时观察时再加 `--stream-events`。
+- TOON 是面向 agent 的结构化文本，不要把它当作普通 JSON 解析；若下游只能接受 JSON，使用 `--format json`。
 - `--cwd` 默认继承调用方当前 cwd；不要把生产目录作为默认工作目录。
 - `--session-id` 与 `--session-root` 用于多轮恢复；不要把不同 cwd 复用到同一个 session ID。
 - `--base-url`、`--api-key` 是 Python 版同等的显式模型配置入口；敏感值只进入子进程环境，不会写入结果。也可用重复的 `--env KEY=VALUE`。

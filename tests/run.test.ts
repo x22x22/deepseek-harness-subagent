@@ -6,12 +6,27 @@ import { DEFAULT_IDLE_TIMEOUT_SECONDS, MODEL_SELECTION_AGENT_INSTRUCTION, ModelS
 import { CURRENT_MODELS, localModelOptions, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
 import { parseArgs as parseStartArgs, processMatches } from '../scripts/start-dsh.ts'
 import { DEFAULT_RUNTIME_ROOT, RUNTIME_VERSION, ensureRuntime } from '../scripts/bootstrap-runtime.mjs'
+import { serializeResult } from '../scripts/serialize.ts'
 
 describe('Node SDK skill runner helpers', () => {
   it('uses one hour idle timeout and parses repeated tasks', () => {
     const options = parseArgs(['--task', 'one', '--task', 'two'])
     assert.equal(options.idleTimeoutSeconds, DEFAULT_IDLE_TIMEOUT_SECONDS)
     assert.deepEqual(options.tasks, ['one', 'two'])
+    assert.equal(options.format, 'toon')
+  })
+
+  it('supports TOON by default and JSON as an explicit compatibility format', () => {
+    assert.equal(parseArgs(['--task', 'x', '--format', 'toon']).format, 'toon')
+    assert.equal(parseArgs(['--task', 'x', '--format', 'json']).format, 'json')
+    assert.throws(() => parseArgs(['--task', 'x', '--format', 'yaml']), /toon, json, or text/)
+  })
+
+  it('serializes agent results with the official TOON encoder', async () => {
+    const toon = await serializeResult({ status: 'completed', turns: [{ answer: 'ok' }] }, 'toon')
+    assert.match(toon, /status: completed/)
+    assert.match(toon, /turns\[1\]\{answer\}:/)
+    assert.match(await serializeResult({ status: 'completed' }, 'json'), /^\{"status":"completed"\}\n$/)
   })
 
   it('supports structured input and disabling idle timeout', () => {
