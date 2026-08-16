@@ -95,6 +95,22 @@ node <skill-dir>/scripts/session.mjs \
 4. 派生调用必须传入包含对应插件的 Cordis 组合；仅启动 `dsh web` 不会让 Node SDK 自动附着到 Web 进程。
 5. 插件缺失时不要让整个 skill 失败，应隐藏该派生模型并回退到官方 Flash，同时向用户说明视觉能力不可用。
 
+## 5a. `MISSING_CREDENTIAL` / 提示缺少 `DEEPSEEK_API_KEY`
+
+先确认脚本已把 `DSH_HOME` 指向本机 dsh home；当前版本会自动使用 `~/.dsh`，不要求用户手工导出 `DEEPSEEK_API_KEY`：
+
+```sh
+node <skill-dir>/scripts/session.mjs \
+  --env DSH_HOME="$HOME/.dsh" \
+  --session-id dsh-credential-check-$(date +%s) \
+  --cwd "$PWD" \
+  --task '只回复：dsh-credential-ok' \
+  --request-timeout-ms 30000 \
+  --idle-timeout 60
+```
+
+若显式指定 `DSH_HOME` 后仍失败，再检查该目录下 `.credentials.yaml`/`.env` 和已选 provider；不要把密钥写入任务文本、配置文件或最终报告。
+
 ## 6. Cordis/import 错误
 
 典型错误包括：

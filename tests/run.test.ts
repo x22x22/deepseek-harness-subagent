@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { describe, it } from 'node:test'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULT_IDLE_TIMEOUT_SECONDS, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, resolveModelRoute, run, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
 import { CURRENT_MODELS, localModelOptions, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
@@ -52,6 +53,7 @@ describe('Node SDK skill runner helpers', () => {
     const launch = runtimeLaunch(options)
     assert.equal(launch.env.DEEPSEEK_BASE_URL, 'https://gateway.example/v1')
     assert.equal(launch.env.DEEPSEEK_API_KEY, 'explicit')
+    assert.equal(launch.env.DSH_HOME, process.env.DSH_HOME?.trim() || join(homedir(), '.dsh'))
     assert.equal(launch.env.DSH_CWD, options.cwd)
     assert.equal(launch.cwd, options.cwd)
   })

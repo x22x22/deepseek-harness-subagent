@@ -1,11 +1,23 @@
 ---
 name: deepseek-harness-subagent
-description: Delegate an independent coding or analysis task to the local DeepSeek Harness runtime through the official Node.js/TypeScript SDK. Use when an agent should work in a separate dsh process with its configured model, tools, workspace, and session boundary.
+description: Run an independent task in a separate DeepSeek Harness (dsh) process through this skill's Node.js/TypeScript SDK. This skill itself launches dsh; do not replace it with the host application's native subagent or delegation tools.
 ---
 
 # DeepSeek Harness Node 子代理
 
 这个 skill 使用 dsh 官方 `@deepseek-ai/dsh-sdk-client` TypeScript SDK，不使用 Python SDK。首次调用时脚本会自动把固定版本的官方 Node runtime 和必要插件安装到 `~/.cache/deepseek-harness-subagent/runtime/`，后续复用缓存；不要求用户拥有 dsh 源码仓库，也不要求手动执行 npm/pnpm 安装。
+
+## 强制执行规则
+
+- 本 skill 中的“subagent”专指 **dsh runtime 内的子代理**，不是 Codex、OpenCode 等宿主自身的 subagent。
+- 必须实际运行本 skill 的脚本；默认入口是：
+  `node /Users/kdump/.codex/skills/deepseek-harness-subagent/scripts/session.mjs`
+- 禁止用 Codex、OpenCode 等宿主的原生 subagent/委托工具（例如 `spawn_agent`、`codex_app__create_thread`、`codex_app__send_message_to_thread`）代替上述脚本。
+- 极简只读任务直接使用短提示词，例如：
+  `使用天气 API 查询今天上海天气，只返回天气、来源/查询时间。`
+- 只有脚本结果中的 `status=completed` 且 `answer` 非空，才算收到 dsh subagent 回复；必须保留原文。
+
+脚本会自动把 `DSH_HOME` 设为调用环境的 `~/.dsh`（除非调用方显式指定），因此 dsh runtime 会读取本机 `.credentials.yaml`、`.env` 和 `settings.yaml`。正常使用不需要手动设置 `DEEPSEEK_API_KEY`；只有用户明确提供独立网关凭据时，才使用 `--api-key` 或 `--env` 覆盖。
 
 SDK 直接调用 JSON-RPC runtime，不要求先启动 `dsh web`。使用本机 Web profile 中的 `modlens`、`vision-router`、`llm-pi-ai` 等动态 provider 时，也不要求 Web 进程保持运行；只要插件已经安装/构建，并通过包含这些插件的独立 Cordis 组合加载即可。统一使用底层脚本检查/启动 Web（仅在确实需要 Web UI 或确认 profile 安装状态时使用）：
 

@@ -2,6 +2,7 @@
 /** Node/TypeScript SDK runner used by the DeepSeek Harness subagent skill. */
 
 import { readFile, stat } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import process from 'node:process'
@@ -230,9 +231,13 @@ function runtimePath(options: CliOptions): string {
 
 export function runtimeLaunch(options: CliOptions): { command: string; args: string[]; cwd: string; env: Record<string, string> } {
   const runtime = runtimePath(options)
+  // The packaged runtime must see the user's dsh credential/settings store.
+  // Do not require callers to copy DEEPSEEK_API_KEY into the environment.
+  const dshHome = process.env.DSH_HOME?.trim() || join(homedir(), '.dsh')
   const env = {
     ...scrubEnvironment(process.env),
     ...options.env,
+    DSH_HOME: dshHome,
     TSX_TSCONFIG_PATH: `${options.repo}/tsconfig.json`,
     DSH_CORDIS_CONFIG: options.cordis,
     DSH_CWD: options.cwd,
