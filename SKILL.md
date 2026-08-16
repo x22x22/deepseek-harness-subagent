@@ -38,7 +38,6 @@ description: Run an independent task in a separate DeepSeek Harness (dsh) proces
 ```sh
 node /Users/kdump/.codex/skills/deepseek-harness-subagent/scripts/session.mjs \
   --session-id dsh-task-$(date +%s) \
-  --session-root "$PWD/.dsh-sessions" \
   --cwd "$PWD" \
   --task '查询今天上海天气，只返回天气、来源或查询时间。' \
   --request-timeout-ms 120000
@@ -62,7 +61,7 @@ node /Users/kdump/.codex/skills/deepseek-harness-subagent/scripts/session.mjs \
 
 ## 能力边界
 
-支持：官方 Node SDK、独立 runtime/cwd、持久 session、多轮任务、通知流、结果序列化和独立 Cordis。
+持久 session 默认统一写入 `$DSH_HOME/sessions`（未设置 `DSH_HOME` 时为 `~/.dsh/sessions`），这样后续启动 dsh Web 时可以读取同一会话目录。支持：官方 Node SDK、独立 runtime/cwd、多轮任务、通知流、结果序列化和独立 Cordis。
 
 不支持：宿主线程管理、per-turn cancel、turn steer、approval RPC 和稳定 usage API。不要在任务中声称执行这些能力。
 

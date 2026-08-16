@@ -51,7 +51,7 @@ describe('Node SDK skill runner helpers', () => {
     const options = parseArgs(['--task', 'x', '--cwd', process.cwd()])
     assert.equal(options.sessionIdSource, 'generated')
     assert.match(options.sessionId, /^dsh-\d{14}-[0-9a-f]{6}$/)
-    assert.equal(options.sessionRoot, join(process.cwd(), '.dsh-sessions'))
+    assert.equal(options.sessionRoot, join(process.env.DSH_HOME?.trim() || join(homedir(), '.dsh'), 'sessions'))
     const metadata = sessionMetadata(options)
     assert.equal(metadata.sessionId, options.sessionId)
     assert.equal(metadata.sessionRoot, options.sessionRoot)
@@ -59,6 +59,7 @@ describe('Node SDK skill runner helpers', () => {
     const provided = parseArgs(['--task', 'x', '--session-id', 'weather-followup', '--session-root', '/workspace/.sessions'])
     assert.equal(provided.sessionIdSource, 'provided')
     assert.equal(provided.sessionId, 'weather-followup')
+    assert.equal(parseArgs(['--task', 'x', '--env', 'DSH_HOME=/custom/dsh-home']).sessionRoot, '/custom/dsh-home/sessions')
   })
 
   it('serializes agent results with the official TOON encoder', async () => {

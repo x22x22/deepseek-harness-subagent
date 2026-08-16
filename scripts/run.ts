@@ -267,7 +267,9 @@ export function parseArgs(argv: string[]): CliOptions {
   if (!stdin && tasks.length === 0 && taskFiles.length === 0) throw new Error('one of --task, --task-file, --input-json, or --stdin is required')
   const resolvedCwd = resolve(cwd)
   const resolvedSessionId = sessionId ?? createSessionId()
-  const resolvedSessionRoot = resolve(sessionRoot ?? join(resolvedCwd, '.dsh-sessions'))
+  const parsedEnv = parseEnv(envValues)
+  const dshHome = parsedEnv.DSH_HOME?.trim() || process.env.DSH_HOME?.trim() || join(homedir(), '.dsh')
+  const resolvedSessionRoot = resolve(sessionRoot ?? join(dshHome, 'sessions'))
   if (!resolvedSessionId.trim()) throw new Error('--session-id must not be blank')
   if (!Number.isFinite(idleTimeoutSeconds) || idleTimeoutSeconds < 0) throw new Error('--idle-timeout must be non-negative')
   if (maxTokens !== undefined && (!Number.isSafeInteger(maxTokens) || maxTokens <= 0)) throw new Error('--max-tokens must be positive')
@@ -293,7 +295,7 @@ export function parseArgs(argv: string[]): CliOptions {
     ...(runtimeBin === undefined ? {} : { runtimeBin: resolve(runtimeBin) }),
     ...(baseUrl === undefined ? {} : { baseUrl }),
     ...(apiKey === undefined ? {} : { apiKey }),
-    env: parseEnv(envValues),
+    env: parsedEnv,
     streamEvents,
     includeEvents,
     announceCwd: announceCwdFlag,

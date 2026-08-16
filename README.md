@@ -49,7 +49,7 @@ node ~/.codex/skills/deepseek-harness-subagent/scripts/session.mjs \
   --task '检查当前项目并运行最小相关测试。'
 ```
 
-默认结果是 TOON 格式；需要 JSON 时显式加 `--format json`。不传 `--session-id` 时脚本会生成友好且不易冲突的会话 ID，并在结果中返回 `sessionId`、`sessionRoot` 和 `resumeHint`。
+默认结果是 TOON 格式；需要 JSON 时显式加 `--format json`。会话默认统一写入 `$DSH_HOME/sessions`（未设置时为 `~/.dsh/sessions`），不传 `--session-id` 时脚本会生成友好且不易冲突的会话 ID，并在结果中返回 `sessionId`、`sessionRoot` 和 `resumeHint`。这样后续启动 dsh Web 时可以读取同一会话目录。
 
 超长或格式复杂的消息可以写入一次性 Markdown 文件：
 
