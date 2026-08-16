@@ -7,6 +7,17 @@ description: Delegate an independent coding or analysis task to the local DeepSe
 
 这个 skill 使用 dsh 官方 `@deepseek-ai/dsh-sdk-client` TypeScript SDK，不使用 Python SDK。Node SDK 与 dsh 内部协议和测试保持同仓库一致。运行脚本通过 `tsx` 加载 dsh 源码 runtime，默认使用 `examples/jsonrpc-agent/cordis.yml`。
 
+SDK 直接调用 JSON-RPC runtime，不要求先启动 `dsh web`。只有需要使用本机 Web profile 中的 `modlens`、`vision-router`、`llm-pi-ai` 等动态 provider 时，才需要确保 Web profile 已启动。统一使用底层脚本检查/启动：
+
+```sh
+.../scripts/start-dsh.ts --profile web --check
+.../scripts/start-dsh.ts --profile web
+```
+
+启动前脚本会检查已有的同 profile dsh 进程；已运行时直接返回 `already-running`。未运行时优先使用 PATH 中的全局 `dsh`，找不到则回退到 `npx --yes @deepseek-ai/dsh`，并以 detached 子进程启动。日志写入 `$DSH_HOME/logs/start-web.log`。
+
+注意：启动 Web profile 不会让 Node SDK 自动附着到 Web 进程。SDK 委托仍由 `DeepSeekHarness` 启动自己的 JSON-RPC runtime；若要使用 Web profile 才有的第三方 provider，应提供包含相同 provider/settings 插件的独立 Cordis 组合（`--cordis`），不能仅依赖 `start-dsh.ts` 启动 Web。
+
 ## 默认模型配置
 
 dsh 当前官方 DeepSeek provider 的基础模型为：

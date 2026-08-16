@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import { join } from 'node:path'
 import { DEFAULT_IDLE_TIMEOUT_SECONDS, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
 import { CURRENT_MODELS, localModelOptions, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
+import { parseArgs as parseStartArgs, processMatches } from '../scripts/start-dsh.ts'
 
 describe('Node SDK skill runner helpers', () => {
   it('uses one hour idle timeout and parses repeated tasks', () => {
@@ -99,5 +100,14 @@ describe('Node SDK skill runner helpers', () => {
       assert.ok(models.some((model) => model.provider === 'vision-http' && model.id.includes('zai-qwen-plus')))
       assert.doesNotMatch(JSON.stringify(models), /API_KEY|SECRET|PASSWORD/)
     } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
+  it('selects global dsh first and recognizes existing web processes', () => {
+    assert.equal(processMatches('/usr/local/bin/dsh web --port 3456', 'web'), true)
+    assert.equal(processMatches('node @deepseek-ai/dsh web', 'web'), true)
+    assert.equal(processMatches('dsh --profile headless', 'web'), false)
+    assert.deepEqual(parseStartArgs(['--profile', 'web', '--port', '3456', '--check']), {
+      profile: 'web', port: 3456, waitMs: 3000, checkOnly: true,
+    })
   })
 })
