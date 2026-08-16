@@ -31,6 +31,45 @@ export class ModelSelectionRequiredError extends Error {
   }
 }
 
+export class DshTaskFailedError extends Error {
+  constructor(public readonly reason: string, public readonly category = 'runtime') {
+    super(`dsh turn failed: ${category}:${reason}`)
+    this.name = 'DshTaskFailedError'
+  }
+}
+
+export interface FailureDetails {
+  message: string
+  nextAction: string
+}
+
+/** Convert runtime failures into actionable, secret-free messages. */
+export function failureDetails(error: unknown): FailureDetails {
+  const raw = error instanceof Error ? `${error.name} ${error.message}` : String(error)
+  if (/MISSING_CREDENTIAL|no API key|credential/i.test(raw)) {
+    return {
+      message: 'dsh runtime 未检测到可用凭据。',
+      nextAction: '请配置本机 dsh 凭据后重试；脚本会自动读取并不会把凭据写入任务。',
+    }
+  }
+  if (/no adapter registered|adapter|provider route/i.test(raw)) {
+    return {
+      message: 'dsh runtime 的模型 provider/adapter 不可用。',
+      nextAction: '请检查当前模型选择和本机 dsh 插件配置后重试。',
+    }
+  }
+  if (/TransportClosed|connection|timeout|gateway|network|fetch/i.test(raw)) {
+    return {
+      message: 'dsh runtime 或模型网关调用失败。',
+      nextAction: '请检查 runtime、网关连通性和本机 dsh 配置后重试。',
+    }
+  }
+  return {
+    message: 'dsh runtime 调用失败。',
+    nextAction: '请检查 stderr、runtime、session 事件和本机 dsh 配置后重试。',
+  }
+}
+
 export function resolveModelRoute(requestedModel: string, requestedProvider = 'deepseek-official'): { provider: string; model: string } {
   if (!requestedModel.includes('/')) return { provider: requestedProvider, model: requestedModel }
   const selected = findModel(requestedModel)
@@ -233,7 +272,7 @@ export function runtimeLaunch(options: CliOptions): { command: string; args: str
   const runtime = runtimePath(options)
   // The packaged runtime must see the user's dsh credential/settings store.
   // Do not require callers to copy DEEPSEEK_API_KEY into the environment.
-  const dshHome = process.env.DSH_HOME?.trim() || join(homedir(), '.dsh')
+  const dshHome = options.env.DSH_HOME?.trim() || process.env.DSH_HOME?.trim() || join(homedir(), '.dsh')
   const env = {
     ...scrubEnvironment(process.env),
     ...options.env,
@@ -337,11 +376,17 @@ export async function run(options: CliOptions): Promise<Record<string, unknown>>
       const result = await runWithIdleTimeout(harness, task, options.sessionId, options.idleTimeoutSeconds, options.streamEvents
         ? (notification) => process.stderr.write(`${JSON.stringify(notification)}\n`)
         : undefined)
+      const turnFinishReason = finishReason(result.events)
+      if (turnFinishReason !== 'completed' || !result.finalResponse?.trim()) {
+        const eventText = JSON.stringify(result.events)
+        const category = /MISSING_CREDENTIAL|no API key|credential/i.test(eventText) ? 'credential' : 'runtime'
+        throw new DshTaskFailedError(turnFinishReason ?? 'empty-response', category)
+      }
       const turn: Record<string, unknown> = {
         sessionId: result.sessionId,
         finalResponse: result.finalResponse,
         answer: result.finalResponse,
-        finish_reason: finishReason(result.events),
+        finish_reason: turnFinishReason,
         answer_empty: !result.finalResponse?.trim(),
         cwd: options.cwd,
         event_count: result.events.length,
@@ -387,14 +432,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   } catch (error) {
     const timeout = error instanceof IdleTimeoutError
     const modelRequired = error instanceof ModelSelectionRequiredError
+    const failure = timeout || modelRequired ? undefined : failureDetails(error)
     const output = {
       status: timeout ? 'idle-timeout' : modelRequired ? 'model-selection-required' : 'error',
       errorType: error instanceof Error ? error.name : 'Error',
-      error: String(error),
+      error: failure?.message,
       agentInstruction: modelRequired ? MODEL_SELECTION_AGENT_INSTRUCTION : undefined,
       models: modelRequired ? error.models : undefined,
       configPath: modelRequired ? error.configPath : undefined,
-      nextAction: timeout ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试' : undefined,
+      nextAction: timeout
+        ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试'
+        : modelRequired ? undefined : failure?.nextAction,
     }
     const { serializeResult } = await import('./serialize.ts')
     process.stdout.write(await serializeResult(output, 'toon'))

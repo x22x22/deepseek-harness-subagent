@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_IDLE_TIMEOUT_SECONDS, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, resolveModelRoute, run, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
+import { DEFAULT_IDLE_TIMEOUT_SECONDS, DshTaskFailedError, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, failureDetails, finishReason, parseArgs, parseEnv, resolveModelRoute, run, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
 import { CURRENT_MODELS, localModelOptions, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
 import { parseArgs as parseStartArgs, processMatches } from '../scripts/start-dsh.ts'
 import { DEFAULT_RUNTIME_ROOT, RUNTIME_VERSION, ensureRuntime } from '../scripts/bootstrap-runtime.mjs'
@@ -30,12 +30,12 @@ describe('Node SDK skill runner helpers', () => {
     assert.match(await serializeResult({ status: 'completed' }, 'json'), /^\{"status":"completed"\}\n$/)
   })
 
-  it('documents adaptive delegation guidance and clarification constraints', async () => {
+  it('documents dsh-only delegation and concise task guidance', async () => {
     const skill = await readFile(new URL('../SKILL.md', import.meta.url), 'utf8')
-    assert.match(skill, /自适应传递信息/)
-    assert.match(skill, /tmp\/subagent-context\.md/)
-    assert.match(skill, /禁止调用 `ask_user_question`/)
-    assert.match(skill, /言简意赅/)
+    assert.match(skill, /Codex、OpenCode/)
+    assert.match(skill, /必须实际运行本 skill 的脚本/)
+    assert.match(skill, /任务提示词保持自包含、简短/)
+    assert.doesNotMatch(skill, /DEEPSEEK_API_KEY|API key|api key/)
   })
 
   it('supports structured input and disabling idle timeout', () => {
@@ -56,6 +56,8 @@ describe('Node SDK skill runner helpers', () => {
     assert.equal(launch.env.DSH_HOME, process.env.DSH_HOME?.trim() || join(homedir(), '.dsh'))
     assert.equal(launch.env.DSH_CWD, options.cwd)
     assert.equal(launch.cwd, options.cwd)
+    const explicitHome = runtimeLaunch(parseArgs(['--task', 'x', '--env', 'DSH_HOME=/custom/dsh-home']))
+    assert.equal(explicitHome.env.DSH_HOME, '/custom/dsh-home')
   })
 
   it('keeps the Python request-timeout spelling as seconds', () => {
@@ -73,6 +75,14 @@ describe('Node SDK skill runner helpers', () => {
   it('scrubs inherited credentials but accepts explicit overrides', () => {
     assert.deepEqual(scrubEnvironment({ SAFE: 'yes', DEEPSEEK_API_KEY: 'secret', EMPTY: undefined }), { SAFE: 'yes' })
     assert.deepEqual(parseEnv(['DEEPSEEK_API_KEY=explicit', 'A=B=C']), { DEEPSEEK_API_KEY: 'explicit', A: 'B=C' })
+  })
+
+  it('turns credential failures into actionable secret-free messages', () => {
+    const failure = failureDetails(new Error('MISSING_CREDENTIAL: no API key for provider route'))
+    assert.equal(failure.message, 'dsh runtime 未检测到可用凭据。')
+    assert.match(failure.nextAction, /配置本机 dsh 凭据/)
+    assert.doesNotMatch(failure.message + failure.nextAction, /DEEPSEEK_API_KEY|sk-/)
+    assert.equal(failureDetails(new DshTaskFailedError('error', 'credential')).message, 'dsh runtime 未检测到可用凭据。')
   })
 
   it('announces the exact cwd for text and structured tasks', () => {

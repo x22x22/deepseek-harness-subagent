@@ -4,6 +4,7 @@ import process from 'node:process'
 let IdleTimeoutError: typeof import('./run.ts').IdleTimeoutError
 let MODEL_SELECTION_AGENT_INSTRUCTION: string
 let ModelSelectionRequiredError: typeof import('./run.ts').ModelSelectionRequiredError
+let failureDetails: typeof import('./run.ts').failureDetails
 let parseArgs: typeof import('./run.ts').parseArgs
 let run: typeof import('./run.ts').run
 
@@ -14,7 +15,7 @@ try {
   process.env.DSH_PACKAGED_RUNTIME_ROOT = runtime.root
   process.env.DSH_PACKAGED_RUNTIME_BIN = runtime.runtimeBin
   process.env.DSH_PACKAGED_CORDIS = String(runtime.cordis);
-  ({ IdleTimeoutError, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, parseArgs, run } = await import('./run.ts'))
+  ({ IdleTimeoutError, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, failureDetails, parseArgs, run } = await import('./run.ts'))
   const options = parseArgs(process.argv.slice(2))
   const result = await run(options)
   const { serializeResult } = await import('./serialize.ts')
@@ -26,16 +27,19 @@ try {
 } catch (error) {
   const timeout = IdleTimeoutError !== undefined && error instanceof IdleTimeoutError
   const modelRequired = ModelSelectionRequiredError !== undefined && error instanceof ModelSelectionRequiredError
+  const failure = timeout || modelRequired ? undefined : failureDetails === undefined
+    ? { message: 'dsh runtime 启动失败。', nextAction: '请检查 runtime 安装、stderr 和本机 dsh 配置后重试。' }
+    : failureDetails(error)
   const output = {
     status: timeout ? 'idle-timeout' : modelRequired ? 'model-selection-required' : 'error',
     errorType: error instanceof Error ? error.name : 'Error',
-    error: String(error),
+    error: failure?.message,
     configPath: modelRequired ? error.configPath : undefined,
     models: modelRequired ? error.models : undefined,
     agentInstruction: modelRequired ? MODEL_SELECTION_AGENT_INSTRUCTION : undefined,
     nextAction: timeout
       ? '检查 runtime、stderr、notifications、session JSONL、cwd 变更和测试后再判断是否重试'
-      : modelRequired ? '先从 models 中选择模型并运行 scripts/configure.mjs --set-model MODEL' : undefined,
+      : modelRequired ? '先从 models 中选择模型并运行 scripts/configure.mjs --set-model MODEL' : failure?.nextAction,
   }
   try {
     const { serializeResult } = await import('./serialize.ts')
