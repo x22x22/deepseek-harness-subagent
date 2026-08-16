@@ -93,6 +93,7 @@ describe('Node SDK skill runner helpers', () => {
     const directory = await mkdtemp(join(process.cwd(), 'tmp-dsh-settings-'))
     const settings = join(directory, 'settings.yaml')
     const fs = await import('node:fs/promises')
+    await fs.mkdir(join(directory, 'profiles/web/node_modules/dsh-vision-router'), { recursive: true })
     await fs.writeFile(settings, `vision-router:\n  httpProviders:\n    - name: zai-qwen-plus\n      model: qwen3.7-plus\nllm-pi-ai:\n  providers:\n    zai-gw:\n      displayName: ZAI 网关\n      models:\n        - id: qwen3.7-plus\n          contextWindow: 128000\n`)
     try {
       const models = localModelOptions({ DSH_HOME: directory })
@@ -109,5 +110,18 @@ describe('Node SDK skill runner helpers', () => {
     assert.deepEqual(parseStartArgs(['--profile', 'web', '--port', '3456', '--check']), {
       profile: 'web', port: 3456, waitMs: 3000, checkOnly: true,
     })
+  })
+
+  it('falls back to the official catalog when optional vision plugins are absent', async () => {
+    const directory = await mkdtemp(join(process.cwd(), 'tmp-no-plugins-'))
+    const fs = await import('node:fs/promises')
+    await fs.writeFile(join(directory, 'settings.yaml'), `vision-router:\n  httpProviders:\n    - name: stale\n      model: stale-model\nllm-pi-ai:\n  providers: {}\n`)
+    try {
+      const models = localModelOptions({ DSH_HOME: directory })
+      assert.deepEqual(models.map((model) => `${model.provider}/${model.id}`), [
+        'deepseek-official/deepseek-v4-flash',
+        'deepseek-official/deepseek-v4-pro',
+      ])
+    } finally { await rm(directory, { recursive: true, force: true }) }
   })
 })

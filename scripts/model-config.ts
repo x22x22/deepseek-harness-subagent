@@ -54,9 +54,11 @@ export function localModelOptions(environment: NodeJS.ProcessEnv = process.env):
     if (!result.some((candidate) => candidate.provider === model.provider && candidate.id === model.id)) result.push(model)
   }
   const deepseek = CURRENT_MODELS
-  const hasModlens = source.includes('agent-default-model:') && source.includes('deepseek-modlens-vision')
-    || existsSync(join(dshHome, 'profiles/web/node_modules/@liustack/modlens'))
-  const hasVisionRouter = source.includes('vision-router:') || existsSync(join(dshHome, 'profiles/web/node_modules/dsh-vision-router'))
+  // Settings can outlive an uninstall. Only advertise plugin-owned routes when
+  // the corresponding package is actually installed; stale YAML must never
+  // make a plain dsh installation fail or expose unusable model choices.
+  const hasModlens = existsSync(join(dshHome, 'profiles/web/node_modules/@liustack/modlens'))
+  const hasVisionRouter = existsSync(join(dshHome, 'profiles/web/node_modules/dsh-vision-router'))
   if (hasModlens) {
     for (const model of deepseek) add(option('deepseek-modlens', model.id, `${model.name} (modlens vision)`, model.contextWindow, 'modlens 视觉桥接'))
   }
@@ -82,10 +84,12 @@ export function localModelOptions(environment: NodeJS.ProcessEnv = process.env):
       if (hasVisionRouter) add(option(`${provider}-vision`, id, `${display} / ${id} + 自动识图`, context, 'llm-pi-ai + 自动识图路由'))
     }
   }
-  const httpStart = source.indexOf('vision-router:')
-  const httpSection = httpStart >= 0 ? source.slice(httpStart) : ''
-  for (const match of httpSection.matchAll(/^\s{4}- name:\s*([^\s#]+)[\s\S]*?^\s{6}model:\s*([^\s#]+)/gm)) {
-    add(option('vision-http', `${match[1]}/${match[2]}`, `${match[1]}/${match[2]}`, 32768, 'vision-router HTTP provider'))
+  if (hasVisionRouter) {
+    const httpStart = source.indexOf('vision-router:')
+    const httpSection = httpStart >= 0 ? source.slice(httpStart) : ''
+    for (const match of httpSection.matchAll(/^\s{4}- name:\s*([^\s#]+)[\s\S]*?^\s{6}model:\s*([^\s#]+)/gm)) {
+      add(option('vision-http', `${match[1]}/${match[2]}`, `${match[1]}/${match[2]}`, 32768, 'vision-router HTTP provider'))
+    }
   }
   return result
 }
