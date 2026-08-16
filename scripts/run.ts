@@ -111,7 +111,7 @@ export function capabilityMatrix(idleTimeoutSeconds: number): Record<string, Rec
       finish_reason: 'derived from root turn/end events',
       provider_model_max_tokens: true,
       workspace_and_cordis: true,
-      parent_cwd_alignment: 'cwd + DSH_CWD + CODEX_PARENT_CWD + task context',
+      parent_cwd_alignment: 'cwd + DSH_CWD + parent-agent cwd + task context',
       idle_timeout: `notification inactivity; ${idleTimeoutSeconds === 0 ? 'disabled' : `${idleTimeoutSeconds} seconds`}`,
       specified_agent: 'indirect: dedicated --cordis composition',
     },
@@ -138,7 +138,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let cwd = process.cwd()
   let repo = process.env.DSH_PACKAGED_RUNTIME_ROOT ?? DEFAULT_REPO
   let cordis: string | undefined = process.env.DSH_PACKAGED_CORDIS
-  let sessionId = 'codex-subagent'
+  let sessionId = 'dsh-subagent'
   let sessionRoot: string | undefined
   let provider = 'deepseek-official'
   let model = process.env.DSH_MODEL
