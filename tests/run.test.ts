@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import { join } from 'node:path'
 import { DEFAULT_IDLE_TIMEOUT_SECONDS, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
-import { CURRENT_MODELS, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
+import { CURRENT_MODELS, localModelOptions, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
 
 describe('Node SDK skill runner helpers', () => {
   it('uses one hour idle timeout and parses repeated tasks', () => {
@@ -83,8 +83,21 @@ describe('Node SDK skill runner helpers', () => {
   it('represents first-use model selection as a recoverable state', () => {
     const error = new ModelSelectionRequiredError('/home/user/.config/deepseek-harness-subagent/config.json')
     assert.equal(error.configPath, '/home/user/.config/deepseek-harness-subagent/config.json')
-    assert.deepEqual(error.models.map((model) => model.id), ['deepseek-v4-flash', 'deepseek-v4-pro'])
+    assert.ok(error.models.some((model) => model.id === 'deepseek-v4-flash'))
     assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /models 列表告知用户/)
     assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /configure\.ts --set-model MODEL/)
+  })
+
+  it('discovers local pi-ai and vision routes without exposing credentials', async () => {
+    const directory = await mkdtemp(join(process.cwd(), 'tmp-dsh-settings-'))
+    const settings = join(directory, 'settings.yaml')
+    const fs = await import('node:fs/promises')
+    await fs.writeFile(settings, `vision-router:\n  httpProviders:\n    - name: zai-qwen-plus\n      model: qwen3.7-plus\nllm-pi-ai:\n  providers:\n    zai-gw:\n      displayName: ZAI 网关\n      models:\n        - id: qwen3.7-plus\n          contextWindow: 128000\n`)
+    try {
+      const models = localModelOptions({ DSH_HOME: directory })
+      assert.ok(models.some((model) => model.provider === 'zai-gw' && model.id === 'qwen3.7-plus'))
+      assert.ok(models.some((model) => model.provider === 'vision-http' && model.id.includes('zai-qwen-plus')))
+      assert.doesNotMatch(JSON.stringify(models), /API_KEY|SECRET|PASSWORD/)
+    } finally { await rm(directory, { recursive: true, force: true }) }
   })
 })

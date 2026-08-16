@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import process from 'node:process'
-import { CURRENT_MODELS, findModel, modelConfigPath, readModelConfig, writeModelConfig } from './model-config.ts'
+import { findModel, modelConfigPath, modelOptions, readModelConfig, writeModelConfig } from './model-config.ts'
 
 function help(): void {
   process.stdout.write(`DeepSeek Harness 默认模型配置\n\n--list-models       列出当前 dsh 官方可选模型\n--show              显示当前已保存配置\n--set-model MODEL   保存默认模型\n--config PATH       覆盖配置文件路径\n`)
@@ -8,9 +8,8 @@ function help(): void {
 
 function printModels(): void {
   process.stdout.write(`${JSON.stringify({
-    provider: 'deepseek-official',
-    models: CURRENT_MODELS,
-    source: 'packages/llm/llm-deepseek/src/index.ts',
+    models: modelOptions(),
+    source: '本机 dsh settings.yaml + 官方适配器 + 已安装 vision 插件',
     agentInstruction: '请选择一个 model，并使用 --set-model MODEL 保存默认配置；未配置前，session/delegate/healthcheck 会拒绝继续调用 subagent。',
   }, null, 2)}\n`)
 }

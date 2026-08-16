@@ -9,10 +9,15 @@ description: Delegate an independent coding or analysis task to the local DeepSe
 
 ## 默认模型配置
 
-dsh 当前官方 DeepSeek provider 可选模型为：
+dsh 当前官方 DeepSeek provider 的基础模型为：
 
 - `deepseek-v4-flash`（DeepSeek-V4-Flash，1,000,000 token 上下文，默认快速模型）
 - `deepseek-v4-pro`（DeepSeek-V4-Pro，1,000,000 token 上下文，复杂推理优先）
+
+本机 Web profile 如果安装了 `@liustack/modlens`、`dsh-vision-router`，或在
+`~/.dsh/settings.yaml` 中配置了 `llm-pi-ai`，模型目录还会动态包含视觉桥接、
+“+ 自动识图”路由、`vision-http` 内置/自定义视觉模型以及第三方 provider（例如
+`zai-gw/qwen3.7-plus`）。必须以脚本输出的 `models` 列表为准，不要只依据本节基础示例。
 
 以上是 dsh 官方 adapter 的默认 catalog；自定义 Cordis/settings 可以替换或增加模型。自定义模型不要写入默认选择器时，可直接用显式 `--model` 或 `DSH_MODEL`。
 
@@ -30,6 +35,9 @@ pnpm --dir /Users/kdump/llm/project/official/deepseek-harness exec tsx \
 .../scripts/configure.ts --list-models
 .../scripts/configure.ts --show
 ```
+
+对于重复模型 ID，使用脚本输出的 `provider/model` 形式选择，例如
+`zai-gw/qwen3.7-plus`；直接写 `deepseek-v4-flash` 时选择官方 `deepseek-official` 路由。
 
 ## 委托流程
 

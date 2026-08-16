@@ -10,7 +10,7 @@ import {
   type HarnessNotification,
   type RunResult,
 } from '@deepseek-ai/dsh-sdk-client'
-import { CURRENT_MODELS, modelConfigPath, readModelConfig } from './model-config.ts'
+import { modelConfigPath, modelOptions, readModelConfig } from './model-config.ts'
 
 export const DEFAULT_REPO = '/Users/kdump/llm/project/official/deepseek-harness'
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 3600
@@ -24,7 +24,7 @@ export class IdleTimeoutError extends Error {
 }
 
 export class ModelSelectionRequiredError extends Error {
-  public readonly models = CURRENT_MODELS
+  public readonly models = modelOptions()
 
   constructor(public readonly configPath: string) {
     super(`default model is not configured; choose one and save it with scripts/configure.ts --set-model MODEL (config: ${configPath})`)

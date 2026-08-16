@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import process from 'node:process'
-import { CURRENT_MODELS, modelConfigPath, readModelConfig } from './model-config.ts'
+import { modelConfigPath, modelOptions, readModelConfig } from './model-config.ts'
 import { DEFAULT_REPO, MODEL_SELECTION_AGENT_INSTRUCTION } from './run.ts'
 
 const repo = resolve(process.argv[2] ?? DEFAULT_REPO)
@@ -26,7 +26,7 @@ const result = {
   modelConfig: {
     path: configPath,
     configured: config ?? null,
-    models: CURRENT_MODELS,
+    models: modelOptions(),
   },
   ...(infrastructureReady && !config ? { agentInstruction: MODEL_SELECTION_AGENT_INSTRUCTION } : {}),
 }
