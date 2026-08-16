@@ -25,6 +25,8 @@ node <skill-dir>/scripts/session.mjs \
 
 只有短任务成功后，才恢复用户原任务。
 
+每次排障复测都必须使用新的 session ID；不要复用业务任务的 session，避免旧 JSONL、cwd 或历史状态造成误判。正常连续对话则反过来：从上一次结果的 `sessionId`、`sessionRoot` 或 `resumeHint` 原样恢复。
+
 默认结果是紧凑 TOON 摘要（由官方 `@toon-format/toon` 编码），不包含完整事件数组。不要让调用方为了确认成功而重复要求完整日志；只有需要定位协议、工具或子 agent 事件时，才加 `--include-events` 或 `--stream-events`。需要 JSON 兼容时显式加 `--format json`。如果 stdout 为空，先检查进程退出码和 stderr，再用唯一 session ID 重试短任务；不要把空 stdout 当作 dsh 已完成。
 
 ## 2. 自动 runtime 安装失败

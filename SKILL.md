@@ -14,6 +14,7 @@ description: Run an independent task in a separate DeepSeek Harness (dsh) proces
 - 禁止使用宿主自身的 subagent、线程委托或协作工具代替上述脚本。
 - 任务提示词保持自包含、简短、只做必要工作；只读任务明确禁止改文件。
 - 只有脚本返回 `status=completed` 且 `answer` 非空，才算收到 dsh 回复；保留 subagent 原文。
+- 每次独立测试都必须新建调用会话并使用新的自动生成或显式 `--session-id`；只有明确要延续对话时才复用已有会话 ID。
 
 ## 标准流程
 
@@ -24,8 +25,9 @@ description: Run an independent task in a separate DeepSeek Harness (dsh) proces
    ```
 
 2. 若返回 `model-selection-required`，依据返回的 `models` 选择模型并运行 `configure.mjs`；不要猜测模型。
-3. 短任务使用 `session.mjs`；需要同一会话多轮时传入唯一 `--session-id` 和 `--session-root`。
-4. 读取 `status`、`cwd`、session、finish reason、notification 数量和 `answer`，再向用户报告。
+3. 短任务使用 `session.mjs`；脚本未传 `--session-id` 时会自动生成带时间和随机熵的友好 ID，并在结果顶层返回 `sessionId`、`sessionRoot` 和 `resumeHint`。
+4. 需要同一会话多轮时，从上一次结果复制 `sessionId`、`sessionRoot` 和 `resumeHint`，在后续调用中原样传入；不要凭记忆重写 ID，也不要改变 cwd 后复用同一会话。
+5. 读取 `status`、`cwd`、session、finish reason、notification 数量和 `answer`，再向用户报告；必须把本次实际使用的 session ID 回显出来。
 
 示例：
 

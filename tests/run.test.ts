@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_IDLE_TIMEOUT_SECONDS, DshTaskFailedError, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, failureDetails, finishReason, parseArgs, parseEnv, resolveModelRoute, run, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
+import { DEFAULT_IDLE_TIMEOUT_SECONDS, DshTaskFailedError, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, createSessionId, failureDetails, finishReason, parseArgs, parseEnv, resolveModelRoute, run, runtimeLaunch, scrubEnvironment, sessionMetadata } from '../scripts/run.ts'
 import { CURRENT_MODELS, localModelOptions, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
 import { parseArgs as parseStartArgs, processMatches } from '../scripts/start-dsh.ts'
 import { DEFAULT_RUNTIME_ROOT, RUNTIME_VERSION, ensureRuntime } from '../scripts/bootstrap-runtime.mjs'
@@ -21,6 +21,22 @@ describe('Node SDK skill runner helpers', () => {
     assert.equal(parseArgs(['--task', 'x', '--format', 'toon']).format, 'toon')
     assert.equal(parseArgs(['--task', 'x', '--format', 'json']).format, 'json')
     assert.throws(() => parseArgs(['--task', 'x', '--format', 'yaml']), /toon, json, or text/)
+  })
+
+  it('generates a friendly resumable session identity and exposes it at the top level', () => {
+    const generated = createSessionId(new Date('2026-08-17T12:34:56.000Z'), 'abc123')
+    assert.equal(generated, 'dsh-20260817123456-abc123')
+    const options = parseArgs(['--task', 'x', '--cwd', process.cwd()])
+    assert.equal(options.sessionIdSource, 'generated')
+    assert.match(options.sessionId, /^dsh-\d{14}-[0-9a-f]{6}$/)
+    assert.equal(options.sessionRoot, join(process.cwd(), '.dsh-sessions'))
+    const metadata = sessionMetadata(options)
+    assert.equal(metadata.sessionId, options.sessionId)
+    assert.equal(metadata.sessionRoot, options.sessionRoot)
+    assert.match(String(metadata.resumeHint), new RegExp(options.sessionId))
+    const provided = parseArgs(['--task', 'x', '--session-id', 'weather-followup', '--session-root', '/workspace/.sessions'])
+    assert.equal(provided.sessionIdSource, 'provided')
+    assert.equal(provided.sessionId, 'weather-followup')
   })
 
   it('serializes agent results with the official TOON encoder', async () => {

@@ -2,6 +2,7 @@
 /** Node/TypeScript SDK runner used by the DeepSeek Harness subagent skill. */
 
 import { readFile, stat } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
 import { homedir } from 'node:os'
 import { extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -86,7 +87,8 @@ export interface CliOptions {
   repo: string
   cordis: string
   sessionId: string
-  sessionRoot?: string
+  sessionIdSource: 'generated' | 'provided'
+  sessionRoot: string
   provider: string
   model?: string
   reasoningEffort?: StoredModelConfig['reasoningEffort']
@@ -101,6 +103,21 @@ export interface CliOptions {
   includeEvents: boolean
   announceCwd: boolean
   format: OutputFormat
+}
+
+export function createSessionId(now = new Date(), entropy = randomBytes(3).toString('hex')): string {
+  const stamp = now.toISOString().replace(/\D/g, '').slice(0, 14)
+  return `dsh-${stamp}-${entropy}`
+}
+
+export function sessionMetadata(options: Pick<CliOptions, 'sessionId' | 'sessionIdSource' | 'sessionRoot'>): Record<string, unknown> {
+  return {
+    sessionId: options.sessionId,
+    session_id: options.sessionId,
+    sessionIdSource: options.sessionIdSource,
+    sessionRoot: options.sessionRoot,
+    resumeHint: `--session-id ${options.sessionId} --session-root ${options.sessionRoot}`,
+  }
 }
 
 export function scrubEnvironment(source: NodeJS.ProcessEnv): Record<string, string> {
@@ -179,7 +196,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let cwd = process.cwd()
   let repo = process.env.DSH_PACKAGED_RUNTIME_ROOT ?? DEFAULT_REPO
   let cordis: string | undefined = process.env.DSH_PACKAGED_CORDIS
-  let sessionId = 'dsh-subagent'
+  let sessionId: string | undefined
   let sessionRoot: string | undefined
   let provider = 'deepseek-official'
   let model = process.env.DSH_MODEL
@@ -229,7 +246,10 @@ export function parseArgs(argv: string[]): CliOptions {
   }
   if (stdin && tasks.length > 0) throw new Error('--stdin cannot be combined with --task or --input-json')
   if (!stdin && tasks.length === 0) throw new Error('one of --task, --input-json, or --stdin is required')
-  if (!sessionId.trim()) throw new Error('--session-id must not be blank')
+  const resolvedCwd = resolve(cwd)
+  const resolvedSessionId = sessionId ?? createSessionId()
+  const resolvedSessionRoot = resolve(sessionRoot ?? join(resolvedCwd, '.dsh-sessions'))
+  if (!resolvedSessionId.trim()) throw new Error('--session-id must not be blank')
   if (!Number.isFinite(idleTimeoutSeconds) || idleTimeoutSeconds < 0) throw new Error('--idle-timeout must be non-negative')
   if (maxTokens !== undefined && (!Number.isSafeInteger(maxTokens) || maxTokens <= 0)) throw new Error('--max-tokens must be positive')
   if (requestTimeoutMs !== undefined && (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0)) throw new Error('--request-timeout-ms must be positive')
@@ -238,11 +258,12 @@ export function parseArgs(argv: string[]): CliOptions {
   if (stdin) tasks.push('')
   return {
     tasks,
-    cwd: resolve(cwd),
+    cwd: resolvedCwd,
     repo: resolve(repo),
     cordis: resolve(cordis ?? `${repo}/examples/jsonrpc-agent/cordis.yml`),
-    sessionId,
-    ...(sessionRoot === undefined ? {} : { sessionRoot: resolve(sessionRoot) }),
+    sessionId: resolvedSessionId,
+    sessionIdSource: sessionId === undefined ? 'generated' : 'provided',
+    sessionRoot: resolvedSessionRoot,
     provider,
     model,
     ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
@@ -393,7 +414,7 @@ export async function run(options: CliOptions): Promise<Record<string, unknown>>
         notification_count: result.notifications.length,
         notificationCount: result.notifications.length,
         session_id: result.sessionId,
-        session_root: options.sessionRoot ?? null,
+    session_root: options.sessionRoot,
       }
       if (options.includeEvents) {
         turn.events = result.events
@@ -406,8 +427,7 @@ export async function run(options: CliOptions): Promise<Record<string, unknown>>
   }
   return {
     status: 'completed',
-    sessionId: options.sessionId,
-    session_id: options.sessionId,
+    ...sessionMetadata(options),
     turns,
     cwd: options.cwd,
     repo: options.repo,
