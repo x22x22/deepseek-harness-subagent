@@ -14,7 +14,7 @@ import { modelConfigPath, modelOptions, readModelConfig, type StoredModelConfig 
 
 export const DEFAULT_REPO = '/Users/kdump/llm/project/official/deepseek-harness'
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 3600
-export const MODEL_SELECTION_AGENT_INSTRUCTION = '必须先把 models 列表告知用户并优先推荐 Flash 组合（官方 Flash，其次视觉/自动识图 Flash）；同时请求用户选择思考程度 off/high/max。用户选择后运行 scripts/configure.ts --set-model MODEL --reasoning-effort LEVEL 保存配置，再重新执行原任务。未完成选择前不得猜测模型或继续调用 subagent。'
+export const MODEL_SELECTION_AGENT_INSTRUCTION = '必须先把 models 列表告知用户；如果存在视觉路由，优先推荐 Flash + 视觉组合（modlens vision、自动识图或 modlens vision + 自动识图），只有没有视觉组合时才推荐官方 Flash；同时请求用户选择思考程度 off/high/max。用户选择后运行 scripts/configure.ts --set-model MODEL --reasoning-effort LEVEL 保存配置，再重新执行原任务。未完成选择前不得猜测模型或继续调用 subagent。'
 
 export class IdleTimeoutError extends Error {
   constructor(public readonly idleTimeoutSeconds: number) {

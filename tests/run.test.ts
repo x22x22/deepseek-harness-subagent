@@ -88,6 +88,8 @@ describe('Node SDK skill runner helpers', () => {
     assert.equal(error.configPath, '/home/user/.config/deepseek-harness-subagent/config.json')
     assert.ok(error.models.some((model) => model.id === 'deepseek-v4-flash'))
     assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /models 列表告知用户/)
+    assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /Flash \+ 视觉组合/)
+    assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /只有没有视觉组合时才推荐官方 Flash/)
     assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /configure\.ts --set-model MODEL/)
   })
 

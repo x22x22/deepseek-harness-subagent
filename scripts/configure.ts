@@ -10,7 +10,7 @@ function printModels(): void {
   process.stdout.write(`${JSON.stringify({
     models: modelOptions(),
     source: '本机 dsh settings.yaml + 官方适配器 + 已安装 vision 插件',
-    agentInstruction: '优先选择 Flash 组合，并选择思考程度 off/high/max；使用 --set-model MODEL --reasoning-effort LEVEL 保存默认配置。',
+    agentInstruction: '如果列表中存在视觉路由，优先选择 Flash + 视觉组合；没有视觉组合时再选择官方 Flash，并选择思考程度 off/high/max；使用 --set-model MODEL --reasoning-effort LEVEL 保存默认配置。',
   }, null, 2)}\n`)
 }
 

@@ -32,7 +32,7 @@ dsh 当前官方 DeepSeek provider 的基础模型为：
 
 以上是 dsh 官方 adapter 的默认 catalog；自定义 Cordis/settings 可以替换或增加模型。自定义模型不要写入默认选择器时，可直接用显式 `--model` 或 `DSH_MODEL`。
 
-首次使用且没有显式 `--model`、`DSH_MODEL` 或持久配置时，脚本会返回 `status=model-selection-required` 和模型列表。主 agent 必须优先推荐 Flash 组合（官方 Flash，其次视觉/自动识图 Flash），并让用户选择思考程度：
+首次使用且没有显式 `--model`、`DSH_MODEL` 或持久配置时，脚本会返回 `status=model-selection-required` 和模型列表。主 agent 必须在存在视觉路由时优先推荐 Flash + 视觉组合（modlens vision、自动识图或 modlens vision + 自动识图），只有没有视觉组合时才推荐官方 Flash，并让用户选择思考程度：
 
 - `off`：关闭思考，响应更快
 - `high`：默认平衡档
