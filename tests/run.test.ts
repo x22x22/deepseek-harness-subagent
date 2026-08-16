@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import { join } from 'node:path'
-import { DEFAULT_IDLE_TIMEOUT_SECONDS, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
+import { DEFAULT_IDLE_TIMEOUT_SECONDS, MODEL_SELECTION_AGENT_INSTRUCTION, ModelSelectionRequiredError, announceCwd, capabilityMatrix, finishReason, parseArgs, parseEnv, resolveModelRoute, run, runtimeLaunch, scrubEnvironment } from '../scripts/run.ts'
 import { CURRENT_MODELS, localModelOptions, readModelConfig, writeModelConfig } from '../scripts/model-config.ts'
 import { parseArgs as parseStartArgs, processMatches } from '../scripts/start-dsh.ts'
 import { DEFAULT_RUNTIME_ROOT, RUNTIME_VERSION, ensureRuntime } from '../scripts/bootstrap-runtime.mjs'
@@ -94,6 +94,34 @@ describe('Node SDK skill runner helpers', () => {
     assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /Flash \+ 视觉组合/)
     assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /只有没有视觉组合时才推荐官方 Flash/)
     assert.match(MODEL_SELECTION_AGENT_INSTRUCTION, /configure\.mjs --set-model MODEL/)
+  })
+
+  it('normalizes provider/model selections before they reach the API', () => {
+    assert.deepEqual(resolveModelRoute('deepseek-official/deepseek-v4-flash'), {
+      provider: 'deepseek-official', model: 'deepseek-v4-flash',
+    })
+    assert.deepEqual(resolveModelRoute('deepseek-modlens/deepseek-v4-flash'), {
+      provider: 'deepseek-modlens', model: 'deepseek-v4-flash',
+    })
+    assert.deepEqual(resolveModelRoute('deepseek-modlens/deepseek-v4-flash', 'deepseek-official'), {
+      provider: 'deepseek-modlens', model: 'deepseek-v4-flash',
+    })
+  })
+
+  it('requires human model selection when the config file is absent', async () => {
+    const directory = await mkdtemp(join(process.cwd(), 'tmp-no-model-config-'))
+    const previous = process.env.DSH_SUBAGENT_CONFIG
+    process.env.DSH_SUBAGENT_CONFIG = join(directory, 'missing.json')
+    try {
+      await assert.rejects(
+        run(parseArgs(['--task', 'diagnostic'])),
+        (error: unknown) => error instanceof ModelSelectionRequiredError && error.models.length >= 2 && /models 列表/.test(MODEL_SELECTION_AGENT_INSTRUCTION),
+      )
+    } finally {
+      if (previous === undefined) delete process.env.DSH_SUBAGENT_CONFIG
+      else process.env.DSH_SUBAGENT_CONFIG = previous
+      await rm(directory, { recursive: true, force: true })
+    }
   })
 
   it('discovers local pi-ai and vision routes without exposing credentials', async () => {

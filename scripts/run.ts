@@ -6,7 +6,7 @@ import { extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import process from 'node:process'
 import type { ContentBlock, HarnessNotification, RunResult } from '@deepseek-ai/dsh-sdk-client'
-import { modelConfigPath, modelOptions, readModelConfig, type StoredModelConfig } from './model-config.ts'
+import { findModel, modelConfigPath, modelOptions, readModelConfig, type StoredModelConfig } from './model-config.ts'
 
 export const DEFAULT_REPO = '/Users/kdump/llm/project/official/deepseek-harness'
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 3600
@@ -27,6 +27,16 @@ export class ModelSelectionRequiredError extends Error {
     super(`default model is not configured; choose one and save it with scripts/configure.ts --set-model MODEL (config: ${configPath})`)
     this.name = 'ModelSelectionRequiredError'
   }
+}
+
+export function resolveModelRoute(requestedModel: string, requestedProvider = 'deepseek-official'): { provider: string; model: string } {
+  if (!requestedModel.includes('/')) return { provider: requestedProvider, model: requestedModel }
+  const selected = findModel(requestedModel)
+  if (!selected) throw new Error(`unknown model ${JSON.stringify(requestedModel)}; run configure.mjs --list-models first`)
+  if (requestedProvider !== 'deepseek-official' && requestedProvider !== selected.provider) {
+    throw new Error(`provider ${JSON.stringify(requestedProvider)} conflicts with model ${JSON.stringify(requestedModel)}`)
+  }
+  return { provider: selected.provider, model: selected.id }
 }
 
 export interface CliOptions {
@@ -275,17 +285,19 @@ async function runWithIdleTimeout(
 }
 
 export async function run(options: CliOptions): Promise<Record<string, unknown>> {
+  const tasks = options.tasks[0] === '' ? [await readFile(0, 'utf8')] : options.tasks
+  if (tasks.length === 0 || tasks.some((task) => typeof task === 'string' && !task.trim())) throw new Error('task must not be blank')
+  const storedConfig = await readModelConfig()
+  const requestedModel = options.model ?? storedConfig?.model
+  if (!requestedModel) throw new ModelSelectionRequiredError(modelConfigPath())
+  const reasoningEffort = options.reasoningEffort ?? storedConfig?.reasoningEffort ?? 'high'
+  const route = resolveModelRoute(requestedModel, options.provider !== 'deepseek-official' ? options.provider : (storedConfig?.provider ?? options.provider))
+  const provider = route.provider
+  const model = route.model
   const sdkEntry = process.env.DSH_RUNTIME_NODE_MODULES
     ? pathToFileURL(join(process.env.DSH_RUNTIME_NODE_MODULES, '@deepseek-ai', 'dsh-sdk-client', 'lib', 'index.js')).href
     : '@deepseek-ai/dsh-sdk-client'
   const { DeepSeekHarness } = await import(sdkEntry)
-  const tasks = options.tasks[0] === '' ? [await readFile(0, 'utf8')] : options.tasks
-  if (tasks.length === 0 || tasks.some((task) => typeof task === 'string' && !task.trim())) throw new Error('task must not be blank')
-  const storedConfig = await readModelConfig()
-  const model = options.model ?? storedConfig?.model
-  if (!model) throw new ModelSelectionRequiredError(modelConfigPath())
-  const reasoningEffort = options.reasoningEffort ?? storedConfig?.reasoningEffort ?? 'high'
-  const provider = options.provider !== 'deepseek-official' ? options.provider : (storedConfig?.provider ?? options.provider)
   const [cwdInfo, repoInfo, cordisInfo, runtimeInfo] = await Promise.all([
     stat(options.cwd),
     stat(options.repo),
