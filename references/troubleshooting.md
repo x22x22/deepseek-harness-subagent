@@ -25,6 +25,8 @@ node <skill-dir>/scripts/session.mjs \
 
 只有短任务成功后，才恢复用户原任务。
 
+默认结果是紧凑 JSON 摘要，不包含完整事件数组。不要让主 agent 为了确认成功而重复要求完整日志；只有需要定位协议、工具或子 agent 事件时，才加 `--include-events` 或 `--stream-events`。如果 stdout 为空，先检查进程退出码和 stderr，再用唯一 session ID 重试短任务；不要把空 stdout 当作 dsh 已完成。
+
 ## 2. 自动 runtime 安装失败
 
 典型错误包括：

@@ -17,6 +17,7 @@ describe('Node SDK skill runner helpers', () => {
   it('supports structured input and disabling idle timeout', () => {
     const options = parseArgs(['--input-json', '[{"type":"text","text":"x"}]', '--no-idle-timeout'])
     assert.equal(options.idleTimeoutSeconds, 0)
+    assert.equal(parseArgs(['--task', 'x', '--include-events']).includeEvents, true)
     assert.deepEqual(options.tasks, [[{ type: 'text', text: 'x' }]])
   })
 

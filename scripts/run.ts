@@ -57,6 +57,7 @@ export interface CliOptions {
   apiKey?: string
   env: Record<string, string>
   streamEvents: boolean
+  includeEvents: boolean
   announceCwd: boolean
   format: 'json' | 'text'
 }
@@ -150,6 +151,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let apiKey: string | undefined
   let stdin = false
   let streamEvents = false
+  let includeEvents = false
   let announceCwdFlag = true
   let format: 'json' | 'text' = 'json'
 
@@ -176,6 +178,7 @@ export function parseArgs(argv: string[]): CliOptions {
       case '--api-key': apiKey = value(argv, index++, arg); break
       case '--env': envValues.push(value(argv, index++, arg)); break
       case '--stream-events': streamEvents = true; break
+      case '--include-events': includeEvents = true; break
       case '--no-announce-cwd': announceCwdFlag = false; break
       case '--format': format = value(argv, index++, arg) as 'json' | 'text'; break
       case '--no-idle-timeout': idleTimeoutSeconds = 0; break
@@ -210,13 +213,14 @@ export function parseArgs(argv: string[]): CliOptions {
     ...(apiKey === undefined ? {} : { apiKey }),
     env: parseEnv(envValues),
     streamEvents,
+    includeEvents,
     announceCwd: announceCwdFlag,
     format,
   }
 }
 
 function printHelp(): void {
-  process.stdout.write(`Node SDK DeepSeek Harness runner\n\n--task TEXT (repeatable) | --input-json JSON | --stdin\n--cwd PATH --repo PATH --cordis PATH --session-id ID --session-root PATH\n--provider NAME --model NAME --reasoning-effort off|high|max --max-tokens N --request-timeout SECONDS\n--request-timeout-ms MS --idle-timeout SECONDS (default 3600; 0 disables)\n--runtime-bin PATH --base-url URL --api-key KEY --env KEY=VALUE\n--no-announce-cwd --stream-events --format json|text\n`)
+  process.stdout.write(`Node SDK DeepSeek Harness runner\n\n--task TEXT (repeatable) | --input-json JSON | --stdin\n--cwd PATH --repo PATH --cordis PATH --session-id ID --session-root PATH\n--provider NAME --model NAME --reasoning-effort off|high|max --max-tokens N --request-timeout SECONDS\n--request-timeout-ms MS --idle-timeout SECONDS (default 3600; 0 disables)\n--runtime-bin PATH --base-url URL --api-key KEY --env KEY=VALUE\n--no-announce-cwd --stream-events --include-events --format json|text\n`)
 }
 
 function runtimePath(options: CliOptions): string {
@@ -327,17 +331,24 @@ export async function run(options: CliOptions): Promise<Record<string, unknown>>
       const result = await runWithIdleTimeout(harness, task, options.sessionId, options.idleTimeoutSeconds, options.streamEvents
         ? (notification) => process.stderr.write(`${JSON.stringify(notification)}\n`)
         : undefined)
-      turns.push({
-        ...result,
+      const turn: Record<string, unknown> = {
+        sessionId: result.sessionId,
+        finalResponse: result.finalResponse,
         answer: result.finalResponse,
         finish_reason: finishReason(result.events),
+        answer_empty: !result.finalResponse?.trim(),
         cwd: options.cwd,
         event_count: result.events.length,
         notification_count: result.notifications.length,
         notificationCount: result.notifications.length,
         session_id: result.sessionId,
         session_root: options.sessionRoot ?? null,
-      })
+      }
+      if (options.includeEvents) {
+        turn.events = result.events
+        turn.notifications = result.notifications
+      }
+      turns.push(turn)
     }
   } finally {
     await harness.close()
