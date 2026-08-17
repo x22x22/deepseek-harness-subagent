@@ -2,6 +2,14 @@
 
 通过 DeepSeek Harness（dsh）官方 Node.js SDK，在独立 runtime 中执行一个编码、分析或查询任务。
 
+## 给 agent 的安装提示词
+
+将下面这段直接发给 agent 即可：
+
+```text
+请安装并使用 deepseek-harness-subagent：先运行 `npx --yes skills add x22x22/deepseek-harness-subagent`，再运行已安装 skill 的 `scripts/healthcheck.mjs`。如果返回 model-selection-required，必须把返回的完整 models 列表告知我，让我选择 provider/model 以及 off、high 或 max 思考程度，然后用 scripts/configure.mjs 保存默认配置；不要猜测模型。若任务涉及图片或识图且默认模型不支持视觉，先用 `scripts/configure.mjs --list-models` 检查包括派生模型在内的完整列表，选择视觉模型并仅对当前调用传 `--model provider/model`，不要覆盖默认配置。之后必须实际运行 skill 的 session.mjs/delegate.mjs 调用 dsh，不要使用宿主自己的 subagent。每次独立测试使用新的 session-id；需要连续对话时复用结果中的 sessionId、sessionRoot 和 resumeHint。长消息使用 --task-file 发送 Markdown 内容，文件是一次性临时文件，脚本会自动删除。
+```
+
 ## 用户安装
 
 需要 Node.js 20+。安装时不要求本机有 dsh 源码仓库，也不需要手动安装本 skill 的 Node 依赖；首次运行脚本会自动准备官方 runtime 到用户缓存目录，并安装 dsh 的 storage/workspace 插件。
@@ -32,14 +40,6 @@ node ~/.codex/skills/deepseek-harness-subagent/scripts/configure.mjs --show
 ```
 
 如果某个任务需要识图，但当前默认模型不支持视觉，先运行 `--list-models`，在完整列表（包括派生模型）中选择名称或描述含 `vision`、`视觉`、`自动识图` 或 `modlens` 的候选，只对该次调用显式传入 `--model provider/model`，不要覆盖默认配置。
-
-## 给 agent 的安装提示词
-
-将下面这段直接发给 agent 即可：
-
-```text
-请安装并使用 deepseek-harness-subagent：先运行 `npx --yes skills add x22x22/deepseek-harness-subagent`，再运行已安装 skill 的 `scripts/healthcheck.mjs`。如果返回 model-selection-required，必须把返回的完整 models 列表告知我，让我选择 provider/model 以及 off、high 或 max 思考程度，然后用 scripts/configure.mjs 保存默认配置；不要猜测模型。若任务涉及图片或识图且默认模型不支持视觉，先用 `scripts/configure.mjs --list-models` 检查包括派生模型在内的完整列表，选择视觉模型并仅对当前调用传 `--model provider/model`，不要覆盖默认配置。之后必须实际运行 skill 的 session.mjs/delegate.mjs 调用 dsh，不要使用宿主自己的 subagent。每次独立测试使用新的 session-id；需要连续对话时复用结果中的 sessionId、sessionRoot 和 resumeHint。长消息使用 --task-file 发送 Markdown 内容，文件是一次性临时文件，脚本会自动删除。
-```
 
 ## 基本调用
 
